@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <!-- ⭐ IMPORTANTE PARA CELULARES -->
+  <!-- ⭐ Viewport mejorado para celulares (incluye viewport-fit) -->
   <meta name="viewport"
         content="width=device-width, initial-scale=1.0,
-                 maximum-scale=1.0, user-scalable=no" />
+                 maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>MACBETH — Motion Comic</title>
   <style>
     html, body {
@@ -119,9 +119,8 @@
       position: relative;
       display: inline-block;
       font-family: Georgia, "Times New Roman", serif;
-      /* ⚠️ NO tocamos font-size ni letter-spacing acá,
-         así respeta lo de .screen-intro h1 */
-      white-space: nowrap; /* 🩸 NUNCA se corta MACBETH en dos líneas */
+      /* ⚠️ NO tocamos font-size ni letter-spacing acá */
+      white-space: nowrap;
       color: #c00000;
       margin: 0;
       text-transform: uppercase;
@@ -325,7 +324,6 @@
     /* Teléfonos en vertical */
     @media (max-width: 700px) and (orientation: portrait) {
       .screen-intro h1 {
-        /* 💥 TÍTULO ENORME EN VERTICAL */
         font-size: 5.2rem;
         letter-spacing: 0.18em;
       }
@@ -369,7 +367,6 @@
     /* Teléfonos en horizontal (landscape) */
     @media (max-height: 500px) and (orientation: landscape) {
       .screen-intro h1 {
-        /* 💥 TAMBIÉN GRANDE EN HORIZONTAL */
         font-size: 4.4rem;
         letter-spacing: 0.18em;
       }
@@ -423,6 +420,24 @@
   </style>
 </head>
 <body>
+
+  <!-- ⬇️ Forzar salir de iframes y usar la ventana completa del navegador -->
+  <script>
+    if (window.self !== window.top) {
+      window.top.location = window.location.href;
+    }
+
+    // 🔳 Fullscreen solo una vez (lo usamos al tocar PLAY)
+    let askedFullscreen = false;
+    function requestFullscreenOnce() {
+      if (askedFullscreen) return;
+      askedFullscreen = true;
+      const el = document.documentElement;
+      if (el.requestFullscreen) el.requestFullscreen();
+      else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+      else if (el.msRequestFullscreen) el.msRequestFullscreen();
+    }
+  </script>
 
   <!-- INTRO GLOBAL -->
   <div class="screen-intro" id="intro">
@@ -597,7 +612,13 @@
       }
     });
 
-    playButton.addEventListener('click', (e) => { e.stopPropagation(); startComic(); });
+    // 🔘 PLAY: pedimos fullscreen y luego empezamos el cómic
+    playButton.addEventListener('click', (e) => {
+      e.stopPropagation();
+      requestFullscreenOnce();
+      startComic();
+    });
+
     musicButton.addEventListener('click', (e) => { e.stopPropagation(); toggleMusic(); });
     prevBtn.addEventListener('click', prevScene);
     nextBtn.addEventListener('click', nextScene);

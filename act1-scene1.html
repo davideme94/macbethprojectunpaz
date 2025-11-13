@@ -102,6 +102,17 @@
 
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.js"></script>
 <script>
+  // 🔳 Fullscreen helper dentro de la escena (por si se abre sola)
+  let sceneAskedFullscreen = false;
+  function requestSceneFullscreenOnce() {
+    if (sceneAskedFullscreen) return;
+    sceneAskedFullscreen = true;
+    const el = document.documentElement;
+    if (el.requestFullscreen) el.requestFullscreen();
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    else if (el.msRequestFullscreen) el.msRequestFullscreen();
+  }
+
   // ====== Permiso de música global desde index ======
   let musicEnabled = false;
   window.addEventListener('message', (event) => {
@@ -167,8 +178,9 @@
       // ===== Prerender de texturas (más liviano que Graphics vivos) =====
       this.createSimpleTextures();
 
-      // Desbloqueo audio por gesto
+      // Desbloqueo audio por gesto + intento fullscreen
       this.input.once('pointerdown', () => {
+        requestSceneFullscreenOnce();
         if (this.sound?.context?.state === 'suspended') this.sound.context.resume();
         if (window.sceneMusic && musicEnabled && !window.sceneMusic.isPlaying) window.sceneMusic.play();
       });
@@ -187,7 +199,7 @@
 
       // Niebla (ahora con sprites prerenderizados)
       this.fogContainer = this.add.container(0,0);
-      const fogCount = 6; // menor que antes
+      const fogCount = 6;
       for (let i=0;i<fogCount;i++){
         const fog = this.add.image(0,0,'fogBlob')
           .setAlpha(0.18)
@@ -671,7 +683,7 @@
 
       this.time.addEvent({
         delay: 1000,
-        repeat: 2, // 3 → 2 → 1
+        repeat: 2,
         callback: () => {
           counter--;
           if (counter > 0) {
