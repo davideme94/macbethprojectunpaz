@@ -118,8 +118,10 @@
       position: relative;
       display: inline-block;
       font-family: Georgia, "Times New Roman", serif;
-      font-size: clamp(4.4rem, 11vw, 8rem);
-      letter-spacing: 0.32em;
+      /* 🔥 CLAVE: usa el tamaño y el espaciado de .screen-intro h1 */
+      font-size: inherit;
+      letter-spacing: inherit;
+      white-space: nowrap; /* 🩸 NUNCA se corta MACBETH en dos líneas */
       color: #c00000;
       margin: 0;
       text-transform: uppercase;

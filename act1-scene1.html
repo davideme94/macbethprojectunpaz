@@ -3,12 +3,101 @@
 <head>
   <meta charset="UTF-8">
   <title>Macbeth — Act I Scene I</title>
+
+  <!-- ✅ Viewport para móviles -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+
   <style>
-    html, body { margin:0; padding:0; width:100%; height:100%; background:#000; overflow:hidden; }
-    #game { width:100%; height:100%; }
+    html, body {
+      margin:0;
+      padding:0;
+      width:100%;
+      height:100%;
+      background:#000;
+      overflow:hidden;
+    }
+
+    /* Contenedor del juego */
+    #game {
+      width:100%;
+      height:100%;
+    }
+
+    /* Overlay para que en vertical pida girar el celu */
+    #rotate-overlay {
+      position:fixed;
+      inset:0;
+      display:none; /* se muestra solo con media queries */
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      background:radial-gradient(circle at top, #200000, #000000);
+      color:#f5f5f5;
+      font-family:system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      padding:24px;
+      z-index:9999;
+    }
+
+    #rotate-overlay .rotate-box {
+      max-width:420px;
+      border:2px solid #d4af37;
+      border-radius:16px;
+      padding:24px 20px;
+      background:rgba(0,0,0,0.8);
+      box-shadow:0 0 24px rgba(0,0,0,0.8);
+    }
+
+    #rotate-overlay h1 {
+      margin:0 0 10px;
+      font-size:1.4rem;
+      color:#d4af37;
+    }
+
+    #rotate-overlay p {
+      margin:4px 0;
+      font-size:1rem;
+      line-height:1.4;
+    }
+
+    /* Pequeña ayuda para Safari iOS con la altura */
+    @supports (-webkit-touch-callout: none) {
+      html, body {
+        height:-webkit-fill-available;
+      }
+    }
+
+    /* 📱 En móviles en MODO VERTICAL: mostrar overlay y ocultar juego */
+    @media (orientation: portrait) and (max-width: 900px) {
+      #rotate-overlay {
+        display:flex;
+      }
+      #game {
+        display:none;
+      }
+    }
+
+    /* 📱 En móviles en MODO HORIZONTAL: ocultar overlay y mostrar juego */
+    @media (orientation: landscape) and (max-width: 900px) {
+      #rotate-overlay {
+        display:none;
+      }
+      #game {
+        display:block;
+      }
+    }
   </style>
 </head>
 <body>
+
+<!-- Overlay que solo aparece en vertical en celulares -->
+<div id="rotate-overlay">
+  <div class="rotate-box">
+    <h1>Rotate your device</h1>
+    <p>For the best experience, please rotate your phone.</p>
+    <p>Para jugar mejor, girá el celular a modo horizontal.</p>
+  </div>
+</div>
+
 <div id="game"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.js"></script>
