@@ -2,6 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <!-- ⭐ IMPORTANTE PARA CELULARES -->
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0,
+                 maximum-scale=1.0, user-scalable=no" />
   <title>MACBETH — Motion Comic</title>
   <style>
     html, body {
@@ -311,6 +315,107 @@
       font-size: 0.9rem; letter-spacing: .18em; color: #d4af37; text-transform: uppercase;
     }
     .loader.visible { display: grid; }
+
+    /* =========================================================
+       📱 RESPONSIVE PARA CELULARES Y TABLETS
+       ========================================================= */
+
+    /* Teléfonos en vertical */
+    @media (max-width: 700px) and (orientation: portrait) {
+      .screen-intro h1 {
+        font-size: 3rem;
+        letter-spacing: 0.18em;
+      }
+      .screen-intro h2 { font-size: 1.2rem; }
+      .screen-intro h3 { font-size: 0.9rem; }
+
+      .play-btn {
+        width: 72px;
+        height: 72px;
+      }
+      .play-btn span {
+        font-size: 0.6rem;
+      }
+
+      .music-btn {
+        padding: 6px 10px;
+        font-size: 0.55rem;
+      }
+
+      .hint {
+        font-size: 0.6rem;
+        right: 10px;
+        left: 10px;
+        text-align: center;
+      }
+
+      .nav-bar {
+        height: 44px;
+        font-size: 0.65rem;
+        padding: 0 10px;
+      }
+      .nav-btn {
+        padding: 3px 8px;
+        font-size: 0.6rem;
+      }
+      .nav-label {
+        font-size: 0.7rem;
+      }
+    }
+
+    /* Teléfonos en horizontal (landscape) */
+    @media (max-height: 500px) and (orientation: landscape) {
+      .screen-intro h1 {
+        font-size: 2.6rem;
+        letter-spacing: 0.18em;
+      }
+      .screen-intro h2 { font-size: 1rem; }
+      .screen-intro h3 { font-size: 0.8rem; }
+
+      .controls {
+        transform: scale(0.85);
+      }
+      .drops {
+        transform: scale(0.85);
+      }
+
+      .hint {
+        font-size: 0.55rem;
+      }
+
+      .nav-bar {
+        height: 40px;
+        font-size: 0.6rem;
+        padding: 0 8px;
+      }
+      .nav-btn {
+        padding: 2px 8px;
+        font-size: 0.55rem;
+      }
+      .nav-label {
+        font-size: 0.65rem;
+      }
+    }
+
+    /* Tablets en vertical */
+    @media (min-width: 700px) and (max-width: 1024px) and (orientation: portrait) {
+      .screen-intro h1 {
+        font-size: 4rem;
+      }
+      .play-btn {
+        transform: scale(1.05);
+      }
+    }
+
+    /* Tablets en horizontal */
+    @media (min-height: 600px) and (orientation: landscape) {
+      .screen-intro h1 {
+        font-size: 3.6rem;
+      }
+      .play-btn {
+        transform: scale(1.03);
+      }
+    }
   </style>
 </head>
 <body>
@@ -347,7 +452,7 @@
 
   <!-- VIEWER -->
   <div class="viewer" id="viewer">
-    <!-- IMPORTANT: allow="autoplay" para liberar audio del iframe -->
+    <!-- allow="autoplay" para liberar audio del iframe -->
     <iframe id="sceneFrame" title="Macbeth Scene" allow="autoplay"></iframe>
     <div class="nav-bar">
       <button class="nav-btn" id="prevBtn">&larr; PREVIOUS</button>
@@ -375,19 +480,16 @@
     const introMusic = document.getElementById('introMusic');
     const loaderEl = document.getElementById('loader');
 
-  const scenes = [
-  { file: 'act1-scene1.html', label: 'Act I · Scene I — The Three Witches' },
-  { file: 'act1-scene2.html', label: 'Act I · Scene II — The King Rewards Macbeth' },
-  { file: 'act1-scene3.html', label: 'Act I · Scene III — Macbeth Meets the Witches' }
-];
-
-
+    const scenes = [
+      { file: 'act1-scene1.html', label: 'Act I · Scene I — The Three Witches' },
+      { file: 'act1-scene2.html', label: 'Act I · Scene II — The King Rewards Macbeth' },
+      { file: 'act1-scene3.html', label: 'Act I · Scene III — Macbeth Meets the Witches' }
+    ];
 
     let introVisible = true;
     let currentIndex = 0;
     let musicOn = false; // permiso global
 
-    // --- NUEVO: helpers para ocultar/mostrar NEXT sin cambiar tu estilo ---
     function lockNext() {
       nextBtn.disabled = true;
       nextBtn.style.visibility = 'hidden';
@@ -415,20 +517,16 @@
     }
 
     function toggleMusic() {
-      // Este toggle es el consentimiento global
       musicOn = !musicOn;
       updateMusicButton();
 
-      // Mientras estamos en la intro, prende o apaga la música de menú
       if (introVisible) {
         if (musicOn) startIntroMusic();
         else stopIntroMusic();
       }
 
-      // Guardamos preferencia
-      try { localStorage.setItem('macbethMusicEnabled', musicOn ? '1':'0'); } catch(e){}
+      try { localStorage.setItem('macbethMusicEnabled', musicOn ? '1' : '0'); } catch(e){}
 
-      // Enviamos la preferencia a la escena actual (si hay iframe cargado)
       postMusicPrefToScene();
     }
 
@@ -455,13 +553,9 @@
       if (index < 0 || index >= scenes.length) return;
       currentIndex = index;
 
-      // loader on
       loaderEl.classList.add('visible');
-
-      // --- NUEVO: bloquear NEXT antes de cargar para evitar "flash" ---
       lockNext();
 
-      // onload para ocultar loader y mandar preferencia
       frameEl.onload = () => {
         postMusicPrefToScene();
         loaderEl.classList.remove('visible');
@@ -471,8 +565,6 @@
       labelEl.textContent = scenes[index].label;
 
       prevBtn.disabled = false;
-      // El estado de NEXT ahora lo determina la escena; de todos modos,
-      // si es la última escena, lo dejamos deshabilitado.
       if (index === scenes.length - 1) lockNext();
     }
 
@@ -490,32 +582,22 @@
       frameEl.contentWindow.postMessage({ type: 'MACBETH_MUSIC_PREF', enabled: musicOn }, '*');
     }
 
-    // Escuchar pedidos desde la escena (p.ej. cuando termina el minijuego)
     window.addEventListener('message', (e) => {
       if (!e.data) return;
       if (e.data.type === 'MACBETH_REQUEST_NEXT') {
         nextScene();
-      }
-      // --- NUEVO: control estricto del botón NEXT según mensajes de la escena ---
-      else if (e.data.type === 'MACBETH_DISABLE_NEXT') {
+      } else if (e.data.type === 'MACBETH_DISABLE_NEXT') {
         lockNext();
       } else if (e.data.type === 'MACBETH_ENABLE_NEXT') {
-        // Solo mostrar NEXT si no es la última (por si acaso)
         if (currentIndex < scenes.length - 1) unlockNext();
       }
     });
 
-    // PLAY
     playButton.addEventListener('click', (e) => { e.stopPropagation(); startComic(); });
-
-    // MUSIC TOGGLE
     musicButton.addEventListener('click', (e) => { e.stopPropagation(); toggleMusic(); });
-
-    // Nav buttons
     prevBtn.addEventListener('click', prevScene);
     nextBtn.addEventListener('click', nextScene);
 
-    // Teclado: solo navegación (PLAY sigue con click/Enter/Espacio en intro)
     window.addEventListener('keydown', (e) => {
       const key = e.key;
 
@@ -528,7 +610,6 @@
       else if (key === 'ArrowLeft') { e.preventDefault(); prevScene(); }
     });
 
-    // Click en escenas para navegar (zonas)
     window.addEventListener('pointerdown', (e) => {
       if (introVisible) return;
       if (!viewerEl.classList.contains('visible')) return;
@@ -542,13 +623,11 @@
       else nextScene();
     });
 
-    // Cargar preferencia previa (opcional)
     try {
       const saved = localStorage.getItem('macbethMusicEnabled');
       if (saved === '1') { musicOn = true; updateMusicButton(); }
     } catch (e) {}
 
-    // Estado inicial: por si el usuario entra directo al viewer
     lockNext();
   </script>
 </body>

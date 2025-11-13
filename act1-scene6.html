@@ -52,7 +52,6 @@
     }
 
     preload() {
-      // personajes e imágenes
       this.load.image('duncan', 'duncan.png');
       this.load.image('macbeth', 'macbeth.png');
       this.load.image('ladymacbeth', 'ladymacbeth.png');
@@ -64,16 +63,15 @@
       this.load.image('blood', 'blood.png');
       this.load.image('dagger', 'dagger.png');
 
-      // ambiente
       this.load.audio('scene6_ambience', 'rain.mp3');
     }
 
     create() {
-      const w = this.scale.width;   // 1600 virtual
-      const h = this.scale.height;  // 900 virtual
+      const w = this.scale.width;
+      const h = this.scale.height;
       this.scaleFactor = Phaser.Math.Clamp(Math.min(w/1600, h/900), 0.7, 1.2);
 
-      // fondo cielo
+      // cielo
       const sky = this.add.graphics();
       sky.fillGradientStyle(0x05050a,0x05050a,0x151019,0x151019,1);
       sky.fillRect(0,0,w,h);
@@ -84,7 +82,7 @@
       ground.fillStyle(0x050506,1);
       ground.fillRect(0,horizon,w,h-horizon+10);
 
-      // música ambiente
+      // sonido
       this.bgMusic = this.sound.add('scene6_ambience', { loop:true, volume:0.4 });
       window.sceneMusic = this.bgMusic;
       this.input.once('pointerdown', () => {
@@ -106,20 +104,20 @@
         { fontFamily:'Georgia', fontSize:t2+'px', color:'#d4af37' }
       );
 
-      // línea divisoria
+      // línea central
       const midX = w/2;
       this.add.rectangle(midX, h*0.54, 2, h*0.7, 0x333333, 0.8).setOrigin(0.5);
 
-      // etiquetas columnas
+      // títulos columnas
       const colTitleStyle = {
         fontFamily:'Georgia',
         fontSize:(20*this.scaleFactor)+'px',
         color:'#d4af37'
       };
-      this.add.text(w*0.23, h*0.26, 'APPEARANCE', colTitleStyle).setOrigin(0.5);
-      this.add.text(w*0.77, h*0.26, 'REALITY', colTitleStyle).setOrigin(0.5);
+      this.add.text(w*0.25, h*0.26, 'APPEARANCE', colTitleStyle).setOrigin(0.5);
+      this.add.text(w*0.75, h*0.26, 'REALITY', colTitleStyle).setOrigin(0.5);
 
-      // texto narrador
+      // narrador
       const narrSize = Phaser.Math.Clamp(22*this.scaleFactor,18,26);
       this.narrText = this.add.text(
         w/2, h*0.14,
@@ -133,7 +131,7 @@
         }
       ).setOrigin(0.5).setAlpha(0);
 
-      // texto informativo inferior
+      // texto de ayuda abajo
       this.infoText = this.add.text(
         w/2, h*0.82,
         '',
@@ -147,15 +145,11 @@
         }
       ).setOrigin(0.5).setAlpha(0);
 
-      // bloquear NEXT desde el inicio
       if (window.parent) {
         window.parent.postMessage({ type:'MACBETH_DISABLE_NEXT' }, '*');
       }
 
-      // crear columnas
       this.createColumns(horizon);
-
-      // secuencia de introducción
       this.playIntro();
     }
 
@@ -163,54 +157,65 @@
       const w = this.scale.width;
       const h = this.scale.height;
 
-      const leftX  = w*0.23;
-      const rightX = w*0.77;
+      const leftX  = w*0.25;
+      const rightX = w*0.75;
 
-      // ESCALAS MÁS PEQUEÑAS
-      const castleScale = 0.28 * this.scaleFactor;
-      const treesScale  = 0.30 * this.scaleFactor;
-      const charScale   = 0.26 * this.scaleFactor;
+      const spread = 170 * this.scaleFactor; // separación horizontal
 
-      // APPEARANCE — izquierda (todo bien separado)
-      this.castleLeft = this.add.sprite(leftX + 10*this.scaleFactor, horizon-130*this.scaleFactor, 'castle')
-        .setScale(castleScale).setOrigin(0.5,1);
-      this.treesLeft = this.add.sprite(leftX - 90*this.scaleFactor, horizon-110*this.scaleFactor, 'trees')
+      // ESCALAS
+      const castleScale = 0.20 * this.scaleFactor;
+      const treesScale  = 0.22 * this.scaleFactor;
+      const charScale   = 0.20 * this.scaleFactor;
+
+      // ========= APPEARANCE (IZQUIERDA) =========
+      // árbol bien a la izquierda
+      this.treesLeft = this.add.sprite(leftX - spread, horizon-120*this.scaleFactor, 'trees')
         .setScale(treesScale).setOrigin(0.5,1);
 
-      this.duncanLeft = this.add.sprite(leftX - 90*this.scaleFactor, horizon, 'duncan')
+      // castillo al otro lado, separado de Macbeth
+      this.castleLeft = this.add.sprite(leftX + spread, horizon-150*this.scaleFactor, 'castle')
+        .setScale(castleScale).setOrigin(0.5,1);
+
+      // personajes en fila, todos separados
+      this.duncanLeft = this.add.sprite(leftX - spread, horizon, 'duncan')
         .setScale(charScale).setOrigin(0.5,1);
-      this.macbethLeft = this.add.sprite(leftX + 5*this.scaleFactor, horizon, 'macbeth')
+      this.macbethLeft = this.add.sprite(leftX, horizon, 'macbeth')
         .setScale(charScale).setOrigin(0.5,1);
-      this.ladyLeft = this.add.sprite(leftX + 100*this.scaleFactor, horizon, 'ladymacbeth')
+      this.ladyLeft = this.add.sprite(leftX + spread, horizon, 'ladymacbeth')
         .setScale(charScale).setOrigin(0.5,1);
 
-      // REALITY — derecha, también separados
-      this.castleRight = this.add.sprite(rightX - 10*this.scaleFactor, horizon-130*this.scaleFactor, 'castle')
+      // ========= REALITY (DERECHA) =========
+      // castillo al lado izquierdo de la columna derecha
+      this.castleRight = this.add.sprite(rightX - spread, horizon-150*this.scaleFactor, 'castle')
         .setScale(castleScale).setOrigin(0.5,1).setTint(0xcccccc);
-      this.treesRight = this.add.sprite(rightX + 90*this.scaleFactor, horizon-110*this.scaleFactor, 'trees')
+
+      // árboles al lado derecho, lejos de lady
+      this.treesRight = this.add.sprite(rightX + spread, horizon-120*this.scaleFactor, 'trees')
         .setScale(treesScale).setOrigin(0.5,1).setTint(0xcccccc);
 
-      this.duncanRight = this.add.sprite(rightX - 100*this.scaleFactor, horizon, 'duncan')
+      // personajes separados
+      this.duncanRight = this.add.sprite(rightX - spread, horizon, 'duncan')
         .setScale(charScale).setOrigin(0.5,1);
-
       this.macbethRight = this.add.sprite(rightX, horizon, 'macbethdoubting')
         .setScale(charScale).setOrigin(0.5,1);
-      this.ladyRight = this.add.sprite(rightX + 100*this.scaleFactor, horizon, 'ladymacbethdark')
+      this.ladyRight = this.add.sprite(rightX + spread, horizon, 'ladymacbethdark')
         .setScale(charScale).setOrigin(0.5,1);
 
-      this.bloodRight = this.add.sprite(rightX - 35*this.scaleFactor, horizon-40*this.scaleFactor, 'blood')
-        .setScale(0.30*this.scaleFactor).setOrigin(0.5,1);
-      this.daggerRight = this.add.sprite(rightX + 55*this.scaleFactor, horizon-60*this.scaleFactor, 'dagger')
-        .setScale(0.32*this.scaleFactor).setOrigin(0.5,1);
+      // sangre cerca de Duncan, sin pisarlo
+      this.bloodRight = this.add.sprite(rightX - spread, horizon-40*this.scaleFactor, 'blood')
+        .setScale(0.24*this.scaleFactor).setOrigin(0.5,1);
+
+      // daga cerca de Lady, sin pisarla
+      this.daggerRight = this.add.sprite(rightX + spread, horizon-40*this.scaleFactor, 'dagger')
+        .setScale(0.26*this.scaleFactor).setOrigin(0.5,1);
 
       // overlay oscuro derecha
       const darkOverlay = this.add.rectangle(
         rightX, horizon-60*this.scaleFactor,
-        this.scale.width*0.44, this.scale.height*0.6,
+        this.scale.width*0.32, this.scale.height*0.6,
         0x000000, 0.25
       ).setOrigin(0.5,0.5);
 
-      // grupo para controlar visibilidad
       this.columnsGroup = this.add.group([
         this.castleLeft, this.treesLeft, this.duncanLeft, this.macbethLeft, this.ladyLeft,
         this.castleRight, this.treesRight, this.duncanRight, this.macbethRight, this.ladyRight,
@@ -219,7 +224,6 @@
 
       this.columnsGroup.setAlpha(0);
 
-      // preparar minijuego
       this.prepareDifferences();
     }
 
@@ -229,7 +233,7 @@
       const makeBoxAroundSprite = (sprite) => {
         const g = this.add.graphics();
         g.lineStyle(3, highlightStroke, 1);
-        const padding = 8 * this.scaleFactor;
+        const padding = 6 * this.scaleFactor;
         const w = sprite.displayWidth + padding;
         const h = sprite.displayHeight + padding;
         g.strokeRoundedRect(sprite.x - w/2, sprite.y - h, w, h, 16);
@@ -266,28 +270,24 @@
         });
       };
 
-      // Lady Macbeth diferente
       makeDiff(
         this.ladyRight,
         "Lady Macbeth looks kind on the left,\nbut on the right she hides a darker heart.",
         this.ladyLeft
       );
 
-      // Macbeth dudando
       makeDiff(
         this.macbethRight,
         "Macbeth smiles on the left,\nbut on the right he is full of doubt.",
         this.macbethLeft
       );
 
-      // Sangre vs castillo limpio
       makeDiff(
         this.bloodRight,
         "On the left the castle looks clean.\nOn the right we see blood. Danger is near.",
         this.castleLeft
       );
 
-      // Daga vs árboles tranquilos
       makeDiff(
         this.daggerRight,
         "On the left everything seems safe.\nOn the right a dagger appears, ready for a crime.",
@@ -359,7 +359,6 @@
         duration:500
       });
 
-      // mostrar columnas
       this.tweens.add({
         targets:this.columnsGroup.getChildren(),
         alpha:1,
@@ -367,7 +366,6 @@
         delay:300
       });
 
-      // contador
       this.counterText = this.add.text(
         w/2, h*0.23,
         'Differences found: 0 / 4',
@@ -385,7 +383,6 @@
         delay:400
       });
 
-      // instrucciones
       this.time.delayedCall(800, () => {
         this.showInfo('Tap on the RIGHT side to spot the 4 differences.\nThey will light up on BOTH sides.');
       });
@@ -448,7 +445,7 @@
   const config = {
     type: Phaser.AUTO,
     parent: 'game',
-    width: 1600,          // tamaño virtual
+    width: 1600,
     height: 900,
     backgroundColor: '#000000',
     pixelArt: true,
