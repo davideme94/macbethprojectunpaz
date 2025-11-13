@@ -40,9 +40,10 @@
       pointer-events: none;
     }
 
+    /* 👑 TÍTULO GLOBAL: GRANDE EN TODOS LADOS */
     .screen-intro h1 {
       font-family: Georgia, "Times New Roman", serif;
-      font-size: clamp(4.4rem, 11vw, 8rem);
+      font-size: clamp(4.8rem, 12vw, 8.6rem);
       letter-spacing: 0.32em;
       color: #c00000;
       margin: 0;
@@ -118,9 +119,8 @@
       position: relative;
       display: inline-block;
       font-family: Georgia, "Times New Roman", serif;
-      /* 🔥 CLAVE: usa el tamaño y el espaciado de .screen-intro h1 */
-      font-size: inherit;
-      letter-spacing: inherit;
+      /* ⚠️ NO tocamos font-size ni letter-spacing acá,
+         así respeta lo de .screen-intro h1 */
       white-space: nowrap; /* 🩸 NUNCA se corta MACBETH en dos líneas */
       color: #c00000;
       margin: 0;
@@ -322,91 +322,89 @@
        📱 RESPONSIVE PARA CELULARES Y TABLETS
        ========================================================= */
 
-   /* Teléfonos en vertical */
-@media (max-width: 700px) and (orientation: portrait) {
-  .screen-intro h1 {
-    /* 💥 Más grande pero sin cortarse */
-    font-size: 4.2rem;
-    letter-spacing: 0.12em;
-  }
-  .screen-intro h2 { font-size: 1.2rem; }
-  .screen-intro h3 { font-size: 0.9rem; }
+    /* Teléfonos en vertical */
+    @media (max-width: 700px) and (orientation: portrait) {
+      .screen-intro h1 {
+        /* 💥 TÍTULO ENORME EN VERTICAL */
+        font-size: 5.2rem;
+        letter-spacing: 0.18em;
+      }
+      .screen-intro h2 { font-size: 1.25rem; }
+      .screen-intro h3 { font-size: 1rem; }
 
-  .play-btn {
-    width: 72px;
-    height: 72px;
-  }
-  .play-btn span {
-    font-size: 0.6rem;
-  }
+      .play-btn {
+        width: 72px;
+        height: 72px;
+      }
+      .play-btn span {
+        font-size: 0.6rem;
+      }
 
-  .music-btn {
-    padding: 6px 10px;
-    font-size: 0.55rem;
-  }
+      .music-btn {
+        padding: 6px 10px;
+        font-size: 0.55rem;
+      }
 
-  .hint {
-    font-size: 0.6rem;
-    right: 10px;
-    left: 10px;
-    text-align: center;
-  }
+      .hint {
+        font-size: 0.6rem;
+        right: 10px;
+        left: 10px;
+        text-align: center;
+      }
 
-  .nav-bar {
-    height: 44px;
-    font-size: 0.65rem;
-    padding: 0 10px;
-  }
-  .nav-btn {
-    padding: 3px 8px;
-    font-size: 0.6rem;
-  }
-  .nav-label {
-    font-size: 0.7rem;
-  }
-}
-
+      .nav-bar {
+        height: 44px;
+        font-size: 0.65rem;
+        padding: 0 10px;
+      }
+      .nav-btn {
+        padding: 3px 8px;
+        font-size: 0.6rem;
+      }
+      .nav-label {
+        font-size: 0.7rem;
+      }
+    }
 
     /* Teléfonos en horizontal (landscape) */
-@media (max-height: 500px) and (orientation: landscape) {
-  .screen-intro h1 {
-    /* Más grande que antes (ya no 2.6rem) */
-    font-size: 3.4rem;
-    letter-spacing: 0.12em;
-  }
-  .screen-intro h2 { font-size: 1.1rem; }
-  .screen-intro h3 { font-size: 0.85rem; }
+    @media (max-height: 500px) and (orientation: landscape) {
+      .screen-intro h1 {
+        /* 💥 TAMBIÉN GRANDE EN HORIZONTAL */
+        font-size: 4.4rem;
+        letter-spacing: 0.18em;
+      }
+      .screen-intro h2 { font-size: 1.2rem; }
+      .screen-intro h3 { font-size: 0.9rem; }
 
-  .controls {
-    transform: scale(0.9);
-  }
-  .drops {
-    transform: scale(0.9);
-  }
+      .controls {
+        transform: scale(0.9);
+      }
+      .drops {
+        transform: scale(0.9);
+      }
 
-  .hint {
-    font-size: 0.55rem;
-  }
+      .hint {
+        font-size: 0.55rem;
+      }
 
-  .nav-bar {
-    height: 40px;
-    font-size: 0.6rem;
-    padding: 0 8px;
-  }
-  .nav-btn {
-    padding: 2px 8px;
-    font-size: 0.55rem;
-  }
-  .nav-label {
-    font-size: 0.65rem;
-  }
-}
-
+      .nav-bar {
+        height: 40px;
+        font-size: 0.6rem;
+        padding: 0 8px;
+      }
+      .nav-btn {
+        padding: 2px 8px;
+        font-size: 0.55rem;
+      }
+      .nav-label {
+        font-size: 0.65rem;
+      }
+    }
 
     /* Tablets en vertical */
     @media (min-width: 700px) and (max-width: 1024px) and (orientation: portrait) {
       .screen-intro h1 {
-        font-size: 4rem;
+        font-size: 5rem;
       }
       .play-btn {
         transform: scale(1.05);
@@ -416,7 +414,7 @@
     /* Tablets en horizontal */
     @media (min-height: 600px) and (orientation: landscape) {
       .screen-intro h1 {
-        font-size: 3.6rem;
+        font-size: 4.8rem;
       }
       .play-btn {
         transform: scale(1.03);
