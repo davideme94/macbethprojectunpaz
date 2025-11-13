@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Macbeth — Act I Scene V</title>
+  <title>Macbeth — Act I Scene VI</title>
   <style>
     html, body {
       margin:0;
@@ -35,173 +35,89 @@
     }
   });
 
-  class Scene5LadyMacbethRise extends Phaser.Scene {
+  class Scene6SpotDifference extends Phaser.Scene {
     constructor() {
-      super('Scene5LadyMacbethRise');
+      super('Scene6SpotDifference');
 
       this.bgMusic = null;
       this.scaleFactor = 1;
 
-      // personajes
-      this.lady = null;
-      this.macbeth = null;
-
-      this.nameTexts = [];
-
-      // elementos de fondo
-      this.fireGlow = null;
-
-      // texto narrador
       this.narrText = null;
+      this.infoText = null;
 
-      // cuenta atrás
-      this.countdownText = null;
-      this.instructionsText = null;
-      this.subInstructionsText = null;
-
-      // minijuego: determinación
-      this.thoughtBubble = null;
-      this.thoughtText = null;
-      this.darkBarBg = null;
-      this.darkBarFill = null;
-      this.darkness = 0;      // acá es "determinación"
-      this.maxDarkness = 7;   // cantidad de clics / frases
-
-      this.magicSymbols = [];
-      this.clickCount = 0;
-      this.phrases = [];
-      this.currentPhraseIndex = 0;
+      this.differenceItems = [];
+      this.foundCount = 0;
+      this.totalDifferences = 4;
+      this.counterText = null;
     }
 
     preload() {
-      this.load.image('ladymacbeth', 'ladymacbeth.png');
+      // personajes e imágenes
+      this.load.image('duncan', 'duncan.png');
       this.load.image('macbeth', 'macbeth.png');
+      this.load.image('ladymacbeth', 'ladymacbeth.png');
 
-      this.load.audio('scene5_ambience', 'rain.mp3');
+      this.load.image('macbethdoubting', 'macbethdoubting.png');
+      this.load.image('ladymacbethdark', 'ladymacbethdark.png');
+      this.load.image('castle', 'castle.png');
+      this.load.image('trees', 'trees.png');
+      this.load.image('blood', 'blood.png');
+      this.load.image('dagger', 'dagger.png');
 
-      // textura pared y ventana simple
-      let g = this.add.graphics();
-      g.fillStyle(0x131018,1);
-      g.fillRect(0,0,200,200);
-      g.generateTexture('wallBlock',200,200);
-
-      g.clear();
-      g.fillStyle(0x101320,1);
-      g.fillRect(0,0,120,160);
-      g.fillStyle(0x1b2240,1);
-      g.fillRect(10,10,100,140);
-      g.generateTexture('windowTall',120,160);
-
-      g.clear();
-      g.fillStyle(0x302018,1);
-      g.fillRect(0,0,120,80);
-      g.fillStyle(0xffaa55,1);
-      g.fillRect(10,30,100,20);
-      g.generateTexture('fireplace',120,80);
-
-      g.destroy();
+      // ambiente
+      this.load.audio('scene6_ambience', 'rain.mp3');
     }
 
     create() {
-      const w = this.scale.width;
-      const h = this.scale.height;
+      const w = this.scale.width;   // 1600 virtual
+      const h = this.scale.height;  // 900 virtual
       this.scaleFactor = Phaser.Math.Clamp(Math.min(w/1600, h/900), 0.7, 1.2);
 
-      // ===== Fondo sala interior del castillo =====
-      const bg = this.add.image(0,0,'wallBlock')
-        .setOrigin(0,0)
-        .setDisplaySize(w,h);
+      // fondo cielo
+      const sky = this.add.graphics();
+      sky.fillGradientStyle(0x05050a,0x05050a,0x151019,0x151019,1);
+      sky.fillRect(0,0,w,h);
 
-      // ventana al fondo izquierda
-      const windowImg = this.add.image(w*0.23, h*0.33, 'windowTall')
-        .setOrigin(0.5,0.5)
-        .setScale(1.6*this.scaleFactor)
-        .setAlpha(0.9);
-
-      // “tormenta” afuera de la ventana (brillo frío)
-      const blueGlow = this.add.circle(
-        windowImg.x,
-        windowImg.y+5*this.scaleFactor,
-        110*this.scaleFactor,
-        0x5b7cff,
-        0.18
-      );
-      blueGlow.setBlendMode(Phaser.BlendModes.ADD);
-
-      // chimenea al fondo derecha
-      const fireplace = this.add.image(w*0.8, h*0.68, 'fireplace')
-        .setOrigin(0.5,1)
-        .setScale(1.7*this.scaleFactor)
-        .setAlpha(0.9);
-
-      // brillo del fuego
-      this.fireGlow = this.add.circle(
-        fireplace.x,
-        fireplace.y-40*this.scaleFactor,
-        130*this.scaleFactor,
-        0xffa84a,
-        0.22
-      );
-      this.fireGlow.setBlendMode(Phaser.BlendModes.ADD);
-
-      // “suelo” oscuro delante
+      // suelo
+      const horizon = h*0.7;
       const ground = this.add.graphics();
-      const horizon = h*0.72;
-      ground.fillStyle(0x070608,1);
+      ground.fillStyle(0x050506,1);
       ground.fillRect(0,horizon,w,h-horizon+10);
 
-      // ===== Música / ambiente =====
-      this.bgMusic = this.sound.add('scene5_ambience', { loop:true, volume:0.5 });
+      // música ambiente
+      this.bgMusic = this.sound.add('scene6_ambience', { loop:true, volume:0.4 });
       window.sceneMusic = this.bgMusic;
       this.input.once('pointerdown', () => {
         if (this.sound?.context?.state === 'suspended') this.sound.context.resume();
         if (musicEnabled && !this.bgMusic.isPlaying) this.bgMusic.play();
       });
 
-      // ===== Título =====
+      // título
       const t1 = Phaser.Math.Clamp(26*this.scaleFactor,18,30);
-      const t2 = Phaser.Math.Clamp(32*this.scaleFactor,22,36);
+      const t2 = Phaser.Math.Clamp(30*this.scaleFactor,22,36);
 
       this.add.text(24*this.scaleFactor, 18*this.scaleFactor,
-        'ACT I · SCENE V — "Lady Macbeth reads the letter"',
-        { fontFamily:'Georgia', fontSize:t1+'px', color:'#cccccc' }
+        'ACT I · SCENE VI — "At Macbeth\'s castle"',
+        { fontFamily:'Georgia', fontSize:t1+'px', color:'#bbbbbb' }
       );
 
       this.add.text(24*this.scaleFactor, 18*this.scaleFactor + t1 + 4,
-        'She calls for courage · Her determination grows',
+        'The king arrives · Appearance vs Reality',
         { fontFamily:'Georgia', fontSize:t2+'px', color:'#d4af37' }
       );
 
-      // ===== Personajes =====
-      const baseY = horizon - 10*this.scaleFactor;
-      const targetHeight = Math.min(h*0.42, 360*this.scaleFactor);
+      // línea divisoria
+      const midX = w/2;
+      this.add.rectangle(midX, h*0.54, 2, h*0.7, 0x333333, 0.8).setOrigin(0.5);
 
-      this.lady = this.add.sprite(w*0.60, baseY, 'ladymacbeth');
-      this.macbeth = this.add.sprite(w*0.25, baseY, 'macbeth').setAlpha(0); // entra después
-
-      [this.lady, this.macbeth].forEach(s => {
-        const sc = targetHeight / s.height;
-        s.setScale(sc);
-      });
-
-      // nombres
-      const nameStyle = {
+      // etiquetas columnas
+      const colTitleStyle = {
         fontFamily:'Georgia',
-        fontSize:(16*this.scaleFactor)+'px',
+        fontSize:(20*this.scaleFactor)+'px',
         color:'#d4af37'
       };
-
-      const makeName = (sprite, text) => {
-        const t = this.add.text(
-          sprite.x,
-          sprite.y + sprite.displayHeight/2 + 8*this.scaleFactor,
-          text,
-          nameStyle
-        ).setOrigin(0.5,0);
-        this.nameTexts.push(t);
-      };
-
-      makeName(this.lady, 'Lady Macbeth');
+      this.add.text(w*0.23, h*0.26, 'APPEARANCE', colTitleStyle).setOrigin(0.5);
+      this.add.text(w*0.77, h*0.26, 'REALITY', colTitleStyle).setOrigin(0.5);
 
       // texto narrador
       const narrSize = Phaser.Math.Clamp(22*this.scaleFactor,18,26);
@@ -217,50 +133,185 @@
         }
       ).setOrigin(0.5).setAlpha(0);
 
-      // cinemática
-      this.playCinematic();
+      // texto informativo inferior
+      this.infoText = this.add.text(
+        w/2, h*0.82,
+        '',
+        {
+          fontFamily:'Georgia',
+          fontSize:Phaser.Math.Clamp(20*this.scaleFactor,16,24)+'px',
+          color:'#ffffff',
+          align:'center',
+          wordWrap:{ width:w*0.9 },
+          lineSpacing: 6
+        }
+      ).setOrigin(0.5).setAlpha(0);
 
       // bloquear NEXT desde el inicio
       if (window.parent) {
         window.parent.postMessage({ type:'MACBETH_DISABLE_NEXT' }, '*');
       }
 
-      this.events.once('shutdown', () => {
-        this.sound.stopAll();
-      });
+      // crear columnas
+      this.createColumns(horizon);
+
+      // secuencia de introducción
+      this.playIntro();
     }
 
-    update(time, delta) {
-      // ligero “flicker” del fuego
-      if (this.fireGlow) {
-        const baseR = 130*this.scaleFactor;
-        const pulse = Math.sin(time*0.004)*8*this.scaleFactor;
-        this.fireGlow.setRadius(baseR + pulse);
-        this.fireGlow.setAlpha(0.18 + Math.abs(Math.sin(time*0.003))*0.12);
-      }
+    createColumns(horizon) {
+      const w = this.scale.width;
+      const h = this.scale.height;
+
+      const leftX  = w*0.23;
+      const rightX = w*0.77;
+
+      // ESCALAS MÁS PEQUEÑAS
+      const castleScale = 0.28 * this.scaleFactor;
+      const treesScale  = 0.30 * this.scaleFactor;
+      const charScale   = 0.26 * this.scaleFactor;
+
+      // APPEARANCE — izquierda (todo bien separado)
+      this.castleLeft = this.add.sprite(leftX + 10*this.scaleFactor, horizon-130*this.scaleFactor, 'castle')
+        .setScale(castleScale).setOrigin(0.5,1);
+      this.treesLeft = this.add.sprite(leftX - 90*this.scaleFactor, horizon-110*this.scaleFactor, 'trees')
+        .setScale(treesScale).setOrigin(0.5,1);
+
+      this.duncanLeft = this.add.sprite(leftX - 90*this.scaleFactor, horizon, 'duncan')
+        .setScale(charScale).setOrigin(0.5,1);
+      this.macbethLeft = this.add.sprite(leftX + 5*this.scaleFactor, horizon, 'macbeth')
+        .setScale(charScale).setOrigin(0.5,1);
+      this.ladyLeft = this.add.sprite(leftX + 100*this.scaleFactor, horizon, 'ladymacbeth')
+        .setScale(charScale).setOrigin(0.5,1);
+
+      // REALITY — derecha, también separados
+      this.castleRight = this.add.sprite(rightX - 10*this.scaleFactor, horizon-130*this.scaleFactor, 'castle')
+        .setScale(castleScale).setOrigin(0.5,1).setTint(0xcccccc);
+      this.treesRight = this.add.sprite(rightX + 90*this.scaleFactor, horizon-110*this.scaleFactor, 'trees')
+        .setScale(treesScale).setOrigin(0.5,1).setTint(0xcccccc);
+
+      this.duncanRight = this.add.sprite(rightX - 100*this.scaleFactor, horizon, 'duncan')
+        .setScale(charScale).setOrigin(0.5,1);
+
+      this.macbethRight = this.add.sprite(rightX, horizon, 'macbethdoubting')
+        .setScale(charScale).setOrigin(0.5,1);
+      this.ladyRight = this.add.sprite(rightX + 100*this.scaleFactor, horizon, 'ladymacbethdark')
+        .setScale(charScale).setOrigin(0.5,1);
+
+      this.bloodRight = this.add.sprite(rightX - 35*this.scaleFactor, horizon-40*this.scaleFactor, 'blood')
+        .setScale(0.30*this.scaleFactor).setOrigin(0.5,1);
+      this.daggerRight = this.add.sprite(rightX + 55*this.scaleFactor, horizon-60*this.scaleFactor, 'dagger')
+        .setScale(0.32*this.scaleFactor).setOrigin(0.5,1);
+
+      // overlay oscuro derecha
+      const darkOverlay = this.add.rectangle(
+        rightX, horizon-60*this.scaleFactor,
+        this.scale.width*0.44, this.scale.height*0.6,
+        0x000000, 0.25
+      ).setOrigin(0.5,0.5);
+
+      // grupo para controlar visibilidad
+      this.columnsGroup = this.add.group([
+        this.castleLeft, this.treesLeft, this.duncanLeft, this.macbethLeft, this.ladyLeft,
+        this.castleRight, this.treesRight, this.duncanRight, this.macbethRight, this.ladyRight,
+        this.bloodRight, this.daggerRight, darkOverlay
+      ]);
+
+      this.columnsGroup.setAlpha(0);
+
+      // preparar minijuego
+      this.prepareDifferences();
     }
 
-    // ===== Cinemática narrador =====
-    playCinematic() {
+    prepareDifferences() {
+      const highlightStroke = 0xd4af37;
+
+      const makeBoxAroundSprite = (sprite) => {
+        const g = this.add.graphics();
+        g.lineStyle(3, highlightStroke, 1);
+        const padding = 8 * this.scaleFactor;
+        const w = sprite.displayWidth + padding;
+        const h = sprite.displayHeight + padding;
+        g.strokeRoundedRect(sprite.x - w/2, sprite.y - h, w, h, 16);
+        g.setAlpha(0);
+        return g;
+      };
+
+      const makeDiff = (spriteRight, message, pairSpriteLeft) => {
+        spriteRight.setInteractive({ useHandCursor:true });
+
+        const boxRight = makeBoxAroundSprite(spriteRight);
+        const boxLeft  = makeBoxAroundSprite(pairSpriteLeft);
+
+        const item = { sprite:spriteRight, found:false, boxes:[boxRight, boxLeft], message };
+        this.differenceItems.push(item);
+
+        spriteRight.on('pointerdown', () => {
+          if (item.found) return;
+          item.found = true;
+          this.foundCount++;
+
+          this.tweens.add({
+            targets:item.boxes,
+            alpha:1,
+            duration:220
+          });
+
+          this.showInfo(message);
+          this.updateCounter();
+
+          if (this.foundCount >= this.totalDifferences) {
+            this.time.delayedCall(1200, () => this.finishGame());
+          }
+        });
+      };
+
+      // Lady Macbeth diferente
+      makeDiff(
+        this.ladyRight,
+        "Lady Macbeth looks kind on the left,\nbut on the right she hides a darker heart.",
+        this.ladyLeft
+      );
+
+      // Macbeth dudando
+      makeDiff(
+        this.macbethRight,
+        "Macbeth smiles on the left,\nbut on the right he is full of doubt.",
+        this.macbethLeft
+      );
+
+      // Sangre vs castillo limpio
+      makeDiff(
+        this.bloodRight,
+        "On the left the castle looks clean.\nOn the right we see blood. Danger is near.",
+        this.castleLeft
+      );
+
+      // Daga vs árboles tranquilos
+      makeDiff(
+        this.daggerRight,
+        "On the left everything seems safe.\nOn the right a dagger appears, ready for a crime.",
+        this.treesLeft
+      );
+    }
+
+    playIntro() {
       const w = this.scale.width;
       const h = this.scale.height;
 
       const lines = [
-        'At Macbeth’s castle, Lady Macbeth reads a letter from her husband.',
-        'He tells her about the witches and their strange prophecy.',
-        'They said he will be king one day.',
-        'Lady Macbeth thinks Macbeth is too kind to take the crown.',
-        'She decides she must be strong and help him.'
+        'King Duncan arrives at Macbeth’s castle.',
+        'He thinks the place is beautiful and safe.',
+        'Banquo says the air is gentle and the birds sing.',
+        'Lady Macbeth smiles and welcomes the king.',
+        'But the audience knows there is a dark secret inside.'
       ];
 
       let step = 0;
 
       const showNext = () => {
         if (step >= lines.length) {
-          // luego de la narración, vamos a su mente
-          this.time.delayedCall(2200, () => {
-            this.startSpellCinematic();
-          });
+          this.time.delayedCall(1500, () => this.startGameIntro());
           return;
         }
 
@@ -272,14 +323,14 @@
           targets:this.narrText,
           alpha:1,
           y:h*0.14,
-          duration:450,
+          duration:400,
           ease:'Quad.easeOut',
           onComplete: () => {
-            this.time.delayedCall(4200, () => {
+            this.time.delayedCall(3500, () => {
               this.tweens.add({
                 targets:this.narrText,
                 alpha:0,
-                duration:350,
+                duration:300,
                 ease:'Quad.easeIn',
                 onComplete: () => {
                   step++;
@@ -294,566 +345,123 @@
       showNext();
     }
 
-    // ===== Cinemática: “Make me a man! Give me courage.” =====
-    startSpellCinematic() {
+    startGameIntro() {
       const w = this.scale.width;
       const h = this.scale.height;
 
-      const fontSize = Phaser.Math.Clamp(20*this.scaleFactor,16,24);
-      const bubble = this.makeBubble(
-        "Macbeth wants to be king,\nbut he is too kind.\n\nI must become stronger.\nMake me a man! Give me courage.",
-        this.lady,
-        fontSize
-      );
-      bubble.alpha = 0;
+      this.narrText.setText('Now look carefully.\nCan you see the difference between APPEARANCE and REALITY?');
+      this.narrText.y = h*0.14;
+      this.narrText.setAlpha(0);
 
       this.tweens.add({
-        targets:bubble,
+        targets:this.narrText,
         alpha:1,
-        y:bubble.y - 6,
-        duration:700,
-        ease:'Quad.easeOut'
+        duration:500
       });
 
-      this.time.delayedCall(5200, () => {
-        this.tweens.add({
-          targets:bubble,
-          alpha:0,
-          duration:600,
-          ease:'Quad.easeIn'
-        });
-      });
-
-      const mindText = this.add.text(
-        w/2, h*0.22,
-        'Now we look inside Lady Macbeth’s mind.',
-        {
-          fontFamily:'Georgia',
-          fontSize: Phaser.Math.Clamp(24*this.scaleFactor,18,28)+'px',
-          color:'#d4af37',
-          align:'center'
-        }
-      ).setOrigin(0.5).setAlpha(0);
-
+      // mostrar columnas
       this.tweens.add({
-        targets:mindText,
+        targets:this.columnsGroup.getChildren(),
         alpha:1,
-        duration:600
+        duration:600,
+        delay:300
       });
 
-      this.time.delayedCall(4200, () => {
-        this.tweens.add({
-          targets:mindText,
-          alpha:0,
-          duration:600,
-          onComplete: () => {
-            mindText.destroy();
-            this.startCountdown();
-          }
-        });
-      });
-    }
-
-    // ===== Cuenta regresiva 10 → 0 =====
-    startCountdown() {
-      const w = this.scale.width;
-      const h = this.scale.height;
-
-      this.countdownText = this.add.text(
-        w/2, h*0.46, '',
-        {
-          fontFamily:'Georgia',
-          fontSize: Phaser.Math.Clamp(80*this.scaleFactor,52,110)+'px',
-          color:'#ff5555',
-          align:'center'
-        }
-      ).setOrigin(0.5).setAlpha(0);
-
-      this.instructionsText = this.add.text(
-        w/2, h*0.26,
-        'Help Lady Macbeth focus her power.',
-        {
-          fontFamily:'Georgia',
-          fontSize: Phaser.Math.Clamp(26*this.scaleFactor,20,30)+'px',
-          color:'#d4af37',
-          align:'center'
-        }
-      ).setOrigin(0.5).setAlpha(1);
-
-      this.subInstructionsText = this.add.text(
-        w/2, h*0.31,
-        'Click on the magic symbols to give her determination.',
+      // contador
+      this.counterText = this.add.text(
+        w/2, h*0.23,
+        'Differences found: 0 / 4',
         {
           fontFamily:'system-ui, sans-serif',
-          fontSize: Phaser.Math.Clamp(18*this.scaleFactor,14,22)+'px',
-          color:'#ffffff',
-          align:'center',
-          wordWrap:{ width:w*0.9 }
-        }
-      ).setOrigin(0.5).setAlpha(1);
-
-      let count = 10;
-
-      const tick = () => {
-        if (count > 0) {
-          this.countdownText.setAlpha(1);
-          this.countdownText.setScale(1);
-          this.countdownText.setText(count.toString());
-
-          this.tweens.add({
-            targets:this.countdownText,
-            scale:1.25,
-            duration:260,
-            yoyo:true,
-            ease:'Quad.easeOut'
-          });
-
-          this.time.delayedCall(1000, () => {
-            count--;
-            tick();
-          });
-        } else {
-          this.countdownText.setAlpha(1);
-          this.countdownText.setScale(1);
-          this.countdownText.setText('GO!');
-
-          this.tweens.add({
-            targets:this.countdownText,
-            scale:1.35,
-            duration:350,
-            yoyo:true,
-            ease:'Quad.easeOut',
-            onComplete: () => {
-              this.tweens.add({
-                targets:this.countdownText,
-                alpha:0,
-                duration:320,
-                onComplete: () => {
-                  this.countdownText.destroy();
-                  this.startDeterminationGame();
-                }
-              });
-            }
-          });
-        }
-      };
-
-      tick();
-    }
-
-    // ===== Minijuego: Help Lady Macbeth Focus Her Power =====
-    startDeterminationGame() {
-      const w = this.scale.width;
-      const h = this.scale.height;
-
-      // barra de determinación (antes "darkness")
-      const barW = Math.min(w*0.6, 420*this.scaleFactor);
-      const barH = 20*this.scaleFactor;
-      const barY = h*0.38;
-
-      this.darkBarBg = this.add.rectangle(
-        w/2, barY, barW, barH, 0x111111, 0.9
-      ).setStrokeStyle(2, 0xd4af37);
-
-      this.darkBarFill = this.add.rectangle(
-        w/2 - barW/2, barY, 0, barH-4*this.scaleFactor, 0x5b1b3b, 1
-      ).setOrigin(0,0.5);
-
-      this.add.text(
-        w/2, barY - 26*this.scaleFactor,
-        'Lady Macbeth’s Determination',
-        {
-          fontFamily:'Georgia',
           fontSize:(18*this.scaleFactor)+'px',
-          color:'#d4af37'
-        }
-      ).setOrigin(0.5);
-
-      // burbuja de pensamiento central
-      const fontSize = Phaser.Math.Clamp(22*this.scaleFactor,16,26);
-      const bubbleMaxWidth = w*0.7;
-
-      const bubbleContainer = this.makeThoughtBubble(
-        w/2, h*0.52,
-        '...',
-        fontSize,
-        bubbleMaxWidth
-      );
-      this.thoughtBubble = bubbleContainer.bg;
-      this.thoughtText = bubbleContainer.text;
-
-      // frases que se muestran a medida que clickean símbolos
-      this.phrases = [
-        'Macbeth wants to be king.',
-        'But he is too kind.',
-        'He will not take the crown by himself.',
-        'I must be stronger than him.',
-        'Make me a man! Give me courage.',
-        'Take away my fear and softness.',
-        'I will help Macbeth become king!'
-      ];
-
-      this.currentPhraseIndex = 0;
-      this.darkness = 0;
-      this.maxDarkness = this.phrases.length;
-      this.clickCount = 0;
-
-      this.showCurrentPhrase();
-
-      // crear símbolos mágicos alrededor de Lady Macbeth
-      this.createMagicSymbols();
-    }
-
-    createMagicSymbols() {
-      const baseX = this.lady.x;
-      const baseY = this.lady.y - this.lady.displayHeight/2 - 10*this.scaleFactor;
-      const radius = 140*this.scaleFactor;
-      const total = this.phrases.length;
-
-      this.magicSymbols = [];
-
-      for (let i = 0; i < total; i++) {
-        const angleDeg = -70 + (140/(total-1))*i; // arco frente a ella
-        const angle = Phaser.Math.DegToRad(angleDeg);
-        const x = baseX + Math.cos(angle)*radius;
-        const y = baseY + Math.sin(angle)*radius;
-
-        const symbol = this.createMagicSymbol(x, y, i);
-        this.magicSymbols.push(symbol);
-      }
-    }
-
-    createMagicSymbol(x, y, index) {
-      const r = 24*this.scaleFactor;
-      const g = this.add.graphics();
-      g.fillStyle(0x2b2148, 0.95);
-      g.fillCircle(0,0,r);
-      g.lineStyle(2, 0xd4af37, 1);
-      g.strokeCircle(0,0,r);
-
-      const txt = this.add.text(0,0,'✦',{
-        fontFamily:'Georgia',
-        fontSize:(22*this.scaleFactor)+'px',
-        color:'#ffffff'
-      }).setOrigin(0.5);
-
-      const cont = this.add.container(x,y,[g,txt]);
-      cont.setSize(r*2,r*2);
-      cont.setInteractive({ useHandCursor:true });
-      cont.symbolIndex = index;
-      cont.clicked = false;
-
-      cont.on('pointerover', () => {
-        this.tweens.add({
-          targets:cont,
-          scale:1.12,
-          duration:120
-        });
-      });
-
-      cont.on('pointerout', () => {
-        this.tweens.add({
-          targets:cont,
-          scale:1,
-          duration:120
-        });
-      });
-
-      cont.on('pointerdown', () => {
-        this.handleSymbolClick(cont);
-      });
-
-      return cont;
-    }
-
-    showCurrentPhrase() {
-      if (!this.thoughtText) return;
-      const phrase = this.phrases[this.currentPhraseIndex] || '';
-      this.thoughtText.setText(phrase);
-    }
-
-    handleSymbolClick(symbol) {
-      if (symbol.clicked) return;
-      symbol.clicked = true;
-
-      // animación del símbolo
-      this.tweens.add({
-        targets:symbol,
-        scale:1.3,
-        duration:120,
-        yoyo:true,
-        onComplete: () => {
-          this.tweens.add({
-            targets:symbol,
-            alpha:0,
-            duration:300,
-            onComplete: () => symbol.destroy()
-          });
-        }
-      });
-
-      this.clickCount = Math.min(this.clickCount + 1, this.maxDarkness);
-      this.darkness = this.clickCount;
-      this.updateDetermBar();
-
-      // avanzar frase
-      if (this.currentPhraseIndex < this.phrases.length-1) {
-        this.currentPhraseIndex++;
-        this.showCurrentPhrase();
-      }
-
-      // si ya clickeó todos, final
-      if (this.clickCount >= this.maxDarkness) {
-        this.time.delayedCall(800, () => {
-          this.triggerFinalDetermination();
-        });
-      }
-    }
-
-    updateDetermBar() {
-      if (!this.darkBarFill || !this.darkBarBg) return;
-      const fullWidth = this.darkBarBg.width - 4*this.scaleFactor;
-      const ratio = Phaser.Math.Clamp(this.darkness/this.maxDarkness, 0, 1);
-      const targetWidth = fullWidth * ratio;
-
-      this.tweens.add({
-        targets:this.darkBarFill,
-        width:targetWidth,
-        duration:320,
-        ease:'Quad.easeOut'
-      });
-    }
-
-    triggerFinalDetermination() {
-      const w = this.scale.width;
-      const h = this.scale.height;
-
-      // asegurar frase final
-      this.thoughtText.setText('I will help Macbeth become king!');
-
-      // texto grande arriba
-      const big = this.add.text(
-        w/2, h*0.18,
-        'HER DETERMINATION IS COMPLETE.',
-        {
-          fontFamily:'Georgia',
-          fontSize: Phaser.Math.Clamp(34*this.scaleFactor,26,44)+'px',
-          color:'#ff4444',
-          align:'center'
+          color:'#ffffff'
         }
       ).setOrigin(0.5).setAlpha(0);
 
       this.tweens.add({
-        targets:big,
+        targets:this.counterText,
         alpha:1,
-        scale:1.08,
-        duration:450,
-        ease:'Back.Out'
+        duration:500,
+        delay:400
       });
 
-      // oscurecer un poco la escena
-      const darkOverlay = this.add.rectangle(
-        0,0,w,h,0x000000,0.35
-      ).setOrigin(0,0);
-      darkOverlay.alpha = 0;
+      // instrucciones
+      this.time.delayedCall(800, () => {
+        this.showInfo('Tap on the RIGHT side to spot the 4 differences.\nThey will light up on BOTH sides.');
+      });
+    }
+
+    showInfo(text) {
+      this.infoText.setText(text);
+      this.infoText.setAlpha(0);
 
       this.tweens.add({
-        targets:darkOverlay,
-        alpha:0.35,
-        duration:550
+        targets:this.infoText,
+        alpha:1,
+        duration:250
       });
+    }
 
-      this.time.delayedCall(2200, () => {
-        this.finishGame();
-      });
+    updateCounter() {
+      if (!this.counterText) return;
+      this.counterText.setText('Differences found: ' + this.foundCount + ' / ' + this.totalDifferences);
     }
 
     finishGame() {
       const w = this.scale.width;
       const h = this.scale.height;
 
-      // resumen
+      this.showInfo(
+        'Well done!\nDuncan sees a friendly castle,\n' +
+        'but you discovered the truth behind the smiles.'
+      );
+
       const summary = this.add.text(
-        w/2, h*0.7,
-        "Lady Macbeth reads Macbeth’s letter about the witches.\n" +
-        "She thinks he is too kind to take the crown.\n" +
-        "She calls for courage and builds her determination.\n" +
-        "She decides to help Macbeth become king.",
+        w/2, h*0.72,
+        "King Duncan trusts Macbeth and Lady Macbeth.\n" +
+        "The castle looks peaceful, but a dark plan is hidden inside.",
         {
           fontFamily:'Georgia',
-          fontSize: Phaser.Math.Clamp(20*this.scaleFactor,16,24)+'px',
+          fontSize:Phaser.Math.Clamp(20*this.scaleFactor,16,24)+'px',
           color:'#ffffff',
           align:'center',
           wordWrap:{ width:w*0.9 },
-          lineSpacing: 14
+          lineSpacing: 10
         }
       ).setOrigin(0.5).setAlpha(0);
 
       this.tweens.add({
         targets:summary,
         alpha:1,
-        duration:700
+        duration:600
       });
 
-      // hacer aparecer a Macbeth y breve diálogo
-      if (this.macbeth) {
-        this.tweens.add({
-          targets:this.macbeth,
-          alpha:1,
-          x:this.macbeth.x + 20*this.scaleFactor,
-          duration:800,
-          ease:'Quad.easeOut'
-        });
-
-        this.time.delayedCall(1200, () => {
-          const fontSize = Phaser.Math.Clamp(18*this.scaleFactor,14,22);
-          const bubbleMac = this.makeBubble(
-            "The king is coming here tonight.",
-            this.macbeth,
-            fontSize
-          );
-          bubbleMac.alpha = 0;
-
-          this.tweens.add({
-            targets:bubbleMac,
-            alpha:1,
-            y:bubbleMac.y - 6,
-            duration:600
-          });
-
-          this.time.delayedCall(2600, () => {
-            const bubbleLady = this.makeBubble(
-              "Welcome him with a smile...\nI will plan the rest.",
-              this.lady,
-              fontSize
-            );
-            bubbleLady.alpha = 0;
-            this.tweens.add({
-              targets:bubbleLady,
-              alpha:1,
-              y:bubbleLady.y - 6,
-              duration:600
-            });
-          });
-        });
-      }
-
-      // habilitar NEXT
       if (window.parent) {
-        window.parent.postMessage({ type:'MACBETH_ENABLE_NEXT' }, '*');
+        this.time.delayedCall(1800, () => {
+          window.parent.postMessage({ type:'MACBETH_ENABLE_NEXT' }, '*');
+        });
       }
-    }
-
-    // ===== Helpers gráficos =====
-    makeBubble(text, sprite, fontSize) {
-      const padding = 14;
-      const maxWidth = 380*this.scaleFactor;
-
-      const txt = this.add.text(0,0,text,{
-        fontFamily:'system-ui, sans-serif',
-        fontSize:fontSize+'px',
-        color:'#ffffff',
-        align:'center',
-        wordWrap:{ width:maxWidth }
-      });
-
-      const w = Math.min(maxWidth, txt.width) + padding*2;
-      const h = txt.height + padding*2;
-
-      const g = this.add.graphics();
-      g.fillStyle(0x000000,0.9);
-      g.lineStyle(2,0xffffff,1);
-      g.fillRoundedRect(-w/2,-h/2,w,h,18);
-      g.strokeRoundedRect(-w/2,-h/2,w,h,18);
-      g.fillTriangle(0,h/2, -14,h/2+14, 14,h/2+14);
-
-      txt.setPosition(-txt.width/2, -txt.height/2);
-
-      let x = sprite.x;
-      let y = sprite.y - sprite.displayHeight/2 - (50*this.scaleFactor);
-
-      const cont = this.add.container(x,y,[g,txt]);
-      return cont;
-    }
-
-    makeThoughtBubble(x,y,text,fontSize,maxWidth) {
-      const padding = 18;
-
-      const txt = this.add.text(0,0,text,{
-        fontFamily:'system-ui, sans-serif',
-        fontSize:fontSize+'px',
-        color:'#ffffff',
-        align:'center',
-        wordWrap:{ width:maxWidth }
-      });
-
-      const w = Math.min(maxWidth, txt.width) + padding*2;
-      const h = txt.height + padding*2;
-
-      const g = this.add.graphics();
-      g.fillStyle(0x000000,0.92);
-      g.lineStyle(2,0xd4af37,1);
-      g.fillRoundedRect(-w/2,-h/2,w,h,20);
-      g.strokeRoundedRect(-w/2,-h/2,w,h,20);
-
-      txt.setPosition(-txt.width/2, -txt.height/2);
-
-      const bg = this.add.container(x,y,[g,txt]);
-      return { bg, text:txt };
-    }
-
-    createChoiceButton(x,y,w,h,label,bgColor) {
-      // (no se usa en esta escena, pero dejo el helper por si lo necesitás después)
-      const rect = this.add.rectangle(0,0,w,h,bgColor,1)
-        .setStrokeStyle(2,0xd4af37,1);
-      const txt = this.add.text(0,0,label,{
-        fontFamily:'system-ui, sans-serif',
-        fontSize:(18*this.scaleFactor)+'px',
-        color:'#ffffff'
-      }).setOrigin(0.5);
-
-      const btn = this.add.container(x,y,[rect,txt]);
-      btn.setSize(w,h);
-      btn.setInteractive({ useHandCursor:true });
-
-      btn.on('pointerover', () => {
-        this.tweens.add({
-          targets:btn,
-          scale:1.04,
-          duration:120
-        });
-      });
-
-      btn.on('pointerout', () => {
-        this.tweens.add({
-          targets:btn,
-          scale:1,
-          duration:120
-        });
-      });
-
-      return btn;
     }
   }
 
-  // ===== Config Phaser =====
+  // ===== Config Phaser Responsive =====
   const config = {
     type: Phaser.AUTO,
     parent: 'game',
-    width: window.innerWidth,
-    height: window.innerHeight,
+    width: 1600,          // tamaño virtual
+    height: 900,
     backgroundColor: '#000000',
     pixelArt: true,
     roundPixels: true,
     powerPreference: 'high-performance',
-    scene: [Scene5LadyMacbethRise]
+    scale: {
+      mode: Phaser.Scale.FIT,
+      autoCenter: Phaser.Scale.CENTER_BOTH
+    },
+    scene: [Scene6SpotDifference]
   };
 
   const game = new Phaser.Game(config);
-
-  window.addEventListener('resize', () => {
-    if (game?.scale) game.scale.resize(window.innerWidth, window.innerHeight);
-  });
 </script>
 </body>
 </html>
