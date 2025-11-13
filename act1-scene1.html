@@ -23,6 +23,13 @@
       height:100%;
     }
 
+    /* Pequeña ayuda para Safari iOS con la altura (100vh real) */
+    @supports (-webkit-touch-callout: none) {
+      html, body, #game {
+        height:-webkit-fill-available;
+      }
+    }
+
     /* Overlay para que en vertical pida girar el celu */
     #rotate-overlay {
       position:fixed;
@@ -57,13 +64,6 @@
       margin:4px 0;
       font-size:1rem;
       line-height:1.4;
-    }
-
-    /* Pequeña ayuda para Safari iOS con la altura */
-    @supports (-webkit-touch-callout: none) {
-      html, body {
-        height:-webkit-fill-available;
-      }
     }
 
     /* 📱 En móviles en MODO VERTICAL: mostrar overlay y ocultar juego */
@@ -157,7 +157,12 @@
 
     create() {
       const w = this.scale.width, h = this.scale.height;
+
+      // Ajuste extra: si la altura es muy bajita (horizontal en celu), reducimos un toque
       this.scaleFactor = Phaser.Math.Clamp(Math.min(w/1600, h/900), 0.7, 1.2);
+      if (h < 500) {
+        this.scaleFactor *= 0.9;
+      }
 
       // ===== Prerender de texturas (más liviano que Graphics vivos) =====
       this.createSimpleTextures();
@@ -762,12 +767,25 @@
     }
   }
 
+  // ===== Helpers de viewport seguros para móviles =====
+  function getViewportSize() {
+    let w = window.innerWidth;
+    let h = window.innerHeight;
+    if (window.visualViewport) {
+      w = window.visualViewport.width;
+      h = window.visualViewport.height;
+    }
+    return { w, h };
+  }
+
+  const vp = getViewportSize();
+
   // ===== Config Phaser con tweaks de performance =====
   const config = {
     type: Phaser.AUTO,
     parent: 'game',
-    width: window.innerWidth,
-    height: window.innerHeight,
+    width: vp.w,
+    height: vp.h,
     backgroundColor: '#000000',
     pixelArt: true,
     roundPixels: true,
@@ -777,8 +795,18 @@
   };
 
   const game = new Phaser.Game(config);
+
+  // Al cambiar tamaño de ventana (barras del browser, etc.)
   window.addEventListener('resize', () => {
-    if (game?.scale) game.scale.resize(window.innerWidth, window.innerHeight);
+    const { w, h } = getViewportSize();
+    if (game?.scale) game.scale.resize(w, h);
+  });
+
+  // Al girar el dispositivo recargamos la escena para recalcular layout
+  window.addEventListener('orientationchange', () => {
+    setTimeout(() => {
+      window.location.reload();
+    }, 400);
   });
 </script>
 </body>
