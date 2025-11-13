@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Macbeth — Act I Scene IV</title>
+  <style>
+    html, body {
+      margin:0;
+      padding:0;
+      width:100%;
+      height:100%;
+      background:#000;
+      overflow:hidden;
+    }
+    #game {
+      width:100%;
+      height:100%;
+    }
+  </style>
+</head>
+<body>
+<div id="game"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.js"></script>
+<script>
+  // ====== Permiso de música global desde index ======
+  let musicEnabled = false;
+  window.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'MACBETH_MUSIC_PREF') {
+      musicEnabled = !!event.data.enabled;
+      if (window.sceneMusic) {
+        if (musicEnabled && !window.sceneMusic.isPlaying) window.sceneMusic.play();
+        else if (!musicEnabled && window.sceneMusic.isPlaying) window.sceneMusic.stop();
+      }
+    }
+  });
+
+  class Scene4GoodDarkThoughts extends Phaser.Scene {
+    constructor() {
+      super('Scene4GoodDarkThoughts');
+
+      this.bgMusic = null;
+      this.scaleFactor = 1;
+
+      // personajes
+      this.duncan = null;
+      this.macbeth = null;
+      this.banquo = null;
+      this.malcolm = null;
+
+      this.nameTexts = [];
+
+      // burbujas / textos
+      this.bubbles = [];
+      this.narrText = null;
+
+      // minijuego
+      this.countdownText = null;
+      this.instructionsText = null;
+      this.subInstructionsText = null;
+
+      this.thoughtBubble = null;
+      this.thoughtText = null;
+      this.goodBtn = null;
+      this.darkBtn = null;
+      this.feedbackText = null;
+
+      this.darkBarBg = null;
+      this.darkBarFill = null;
+      this.darkness = 0;
+      this.maxDarkness = 4;
+
+      this.thoughts = [];
+      this.currentThoughtIndex = 0;
+    }
+
+    preload() {
+      this.load.image('duncan', 'duncan.png');
+      this.load.image('macbeth', 'macbeth.png');
+      this.load.image('banquo', 'banquo.png');
+      this.load.image('malcolm', 'malcolm.png');
+
+      this.load.audio('scene4_ambience', 'rain.mp3');
+
+      // textura simple para el castillo / fondo
+      let g = this.add.graphics();
+      // bloque de pared
+      g.fillStyle(0x191c25,1);
+      g.fillRect(0,30,140,130);
+      // almenas arriba
+      g.fillStyle(0x222632,1);
+      for (let i = 0; i < 5; i++) {
+        g.fillRect(8 + i*24, 10, 18, 20);
+      }
+      // puerta simple
+      g.fillStyle(0x0b0b10,1);
+      g.fillRect(58,90,24,40);
+      g.generateTexture('castle',140,160);
+      g.destroy();
+    }
+
+    create() {
+      const w = this.scale.width;
+      const h = this.scale.height;
+      this.scaleFactor = Phaser.Math.Clamp(Math.min(w/1600, h/900), 0.7, 1.2);
+
+      // fondo cielo
+      const sky = this.add.graphics();
+      sky.fillGradientStyle(0x05050a,0x05050a,0x151019,0x151019,1);
+      sky.fillRect(0,0,w,h);
+
+      // suelo
+      const horizon = h*0.7;
+      const ground = this.add.graphics();
+      ground.fillStyle(0x050506,1);
+      ground.fillRect(0,horizon,w,h-horizon+10);
+
+      // castillo al fondo (Forres)
+      const castle = this.add.image(w*0.8, horizon-40*this.scaleFactor, 'castle')
+        .setOrigin(0.5,1)
+        .setScale(1.7*this.scaleFactor)
+        .setAlpha(0.85);
+
+      // música / ambiente
+      this.bgMusic = this.sound.add('scene4_ambience', { loop:true, volume:0.5 });
+      window.sceneMusic = this.bgMusic;
+      this.input.once('pointerdown', () => {
+        if (this.sound?.context?.state === 'suspended') this.sound.context.resume();
+        if (musicEnabled && !this.bgMusic.isPlaying) this.bgMusic.play();
+      });
+
+      // título
+      const t1 = Phaser.Math.Clamp(26*this.scaleFactor,18,30);
+      const t2 = Phaser.Math.Clamp(32*this.scaleFactor,22,36);
+
+      this.add.text(24*this.scaleFactor, 18*this.scaleFactor,
+        'ACT I · SCENE IV — "At the king\'s castle"',
+        { fontFamily:'Georgia', fontSize:t1+'px', color:'#bbbbbb' }
+      );
+
+      this.add.text(24*this.scaleFactor, 18*this.scaleFactor + t1 + 4,
+        'The king thanks Macbeth · Malcolm is named heir',
+        { fontFamily:'Georgia', fontSize:t2+'px', color:'#d4af37' }
+      );
+
+      // personajes
+      const baseY = horizon - 10*this.scaleFactor;
+      const targetHeight = Math.min(h*0.35, 320*this.scaleFactor);
+
+      this.duncan = this.add.sprite(w*0.68, baseY, 'duncan');
+      this.macbeth = this.add.sprite(w*0.32, baseY, 'macbeth');
+      this.banquo = this.add.sprite(w*0.18, baseY+4*this.scaleFactor, 'banquo');
+      this.malcolm = this.add.sprite(w*0.83, baseY+4*this.scaleFactor, 'malcolm');
+
+      [this.duncan, this.macbeth, this.banquo, this.malcolm].forEach(s => {
+        const sc = targetHeight / s.height;
+        s.setScale(sc);
+      });
+
+      // nombres debajo
+      const nameStyle = {
+        fontFamily:'Georgia',
+        fontSize:(16*this.scaleFactor)+'px',
+        color:'#d4af37'
+      };
+
+      const makeName = (sprite, text) => {
+        const t = this.add.text(
+          sprite.x,
+          sprite.y + sprite.displayHeight/2 + 8*this.scaleFactor,
+          text,
+          nameStyle
+        ).setOrigin(0.5,0);
+        this.nameTexts.push(t);
+      };
+
+      makeName(this.duncan, 'King Duncan');
+      makeName(this.macbeth, 'Macbeth');
+      makeName(this.banquo, 'Banquo');
+      makeName(this.malcolm, 'Malcolm');
+
+      // ligera "respiración" para Duncan
+      this.duncanBaseScale = this.duncan.scale;
+
+      // pequeña luz cálida cerca del rey (solo Duncan)
+      const kingLight = this.add.circle(
+        this.duncan.x-10*this.scaleFactor,
+        this.duncan.y-40*this.scaleFactor,
+        90*this.scaleFactor,
+        0xffd27f,0.16
+      );
+      kingLight.setBlendMode(Phaser.BlendModes.ADD);
+
+      // texto narrador
+      const narrSize = Phaser.Math.Clamp(22*this.scaleFactor,18,26);
+      this.narrText = this.add.text(
+        w/2, h*0.14,
+        '',
+        {
+          fontFamily:'Georgia',
+          fontSize:narrSize+'px',
+          color:'#ffffff',
+          align:'center',
+          wordWrap:{ width:w*0.9 }
+        }
+      ).setOrigin(0.5).setAlpha(0);
+
+      // secuencia de burbujas (cinemática)
+      this.playCinematic();
+
+      // bloquear NEXT desde el inicio
+      if (window.parent) {
+        window.parent.postMessage({ type:'MACBETH_DISABLE_NEXT' }, '*');
+      }
+
+      this.events.once('shutdown', () => {
+        this.sound.stopAll();
+      });
+    }
+
+    update(time, delta) {
+      if (this.duncan) {
+        const s = this.duncanBaseScale + Math.sin(time*0.003)*0.01;
+        this.duncan.setScale(s);
+      }
+    }
+
+    // ===== Cinemática sencilla =====
+    playCinematic() {
+      const w = this.scale.width;
+      const h = this.scale.height;
+
+      const lines = [
+        'King Duncan has punished the traitor, the old Thane of Cawdor.',
+        'Now he thanks Macbeth and Banquo for their brave fighting.',
+        'He also is proud of his son Malcolm.',
+        'Duncan says Malcolm will be the next king of Scotland.',
+        'Macbeth smiles on the outside… but inside his thoughts are changing.'
+      ];
+
+      let step = 0;
+
+      const showNext = () => {
+        if (step >= lines.length) {
+          // pequeño texto final y luego minijuego
+          this.time.delayedCall(2000, () => {
+            this.startThoughtCinematic();
+          });
+          return;
+        }
+
+        this.narrText.setText(lines[step]);
+        this.narrText.setAlpha(0);
+        this.narrText.y = h*0.14 + 10*this.scaleFactor;
+
+        this.tweens.add({
+          targets:this.narrText,
+          alpha:1,
+          y:h*0.14,
+          duration:400,
+          ease:'Quad.easeOut',
+          onComplete: () => {
+            this.time.delayedCall(4000, () => {
+              this.tweens.add({
+                targets:this.narrText,
+                alpha:0,
+                duration:300,
+                ease:'Quad.easeIn',
+                onComplete: () => {
+                  step++;
+                  showNext();
+                }
+              });
+            });
+          }
+        });
+      };
+
+      showNext();
+    }
+
+    // Cinemática que prepara el minijuego
+    startThoughtCinematic() {
+      const w = this.scale.width;
+      const h = this.scale.height;
+
+      const fontSize = Phaser.Math.Clamp(20*this.scaleFactor,16,24);
+      const bubble = this.makeBubble(
+        "Malcolm is now the prince.\nHe is in my way.\nStars, hide my dark wishes...",
+        this.macbeth,
+        fontSize
+      );
+      bubble.alpha = 0;
+      this.bubbles.push(bubble);
+
+      this.tweens.add({
+        targets:bubble,
+        alpha:1,
+        y:bubble.y - 8,
+        duration:600,
+        ease:'Quad.easeOut'
+      });
+
+      this.time.delayedCall(5000, () => {
+        this.tweens.add({
+          targets:bubble,
+          alpha:0,
+          duration:500,
+          ease:'Quad.easeIn'
+        });
+      });
+
+      // texto "inside Macbeth's mind"
+      const mindText = this.add.text(
+        w/2, h*0.2,
+        'Now we look inside Macbeth’s mind.',
+        {
+          fontFamily:'Georgia',
+          fontSize: Phaser.Math.Clamp(24*this.scaleFactor,18,28)+'px',
+          color:'#d4af37',
+          align:'center'
+        }
+      ).setOrigin(0.5).setAlpha(0);
+
+      this.tweens.add({
+        targets:mindText,
+        alpha:1,
+        duration:500
+      });
+
+      this.time.delayedCall(4200, () => {
+        this.tweens.add({
+          targets:mindText,
+          alpha:0,
+          duration:500,
+          onComplete: () => {
+            mindText.destroy();
+            this.startCountdown();
+          }
+        });
+      });
+    }
+
+    // ===== Cuenta regresiva 10 → 0 =====
+    startCountdown() {
+      const w = this.scale.width;
+      const h = this.scale.height;
+
+      this.countdownText = this.add.text(
+        w/2, h*0.45, '',
+        {
+          fontFamily:'Georgia',
+          fontSize: Phaser.Math.Clamp(80*this.scaleFactor,52,110)+'px',
+          color:'#ff5555',
+          align:'center'
+        }
+      ).setOrigin(0.5).setAlpha(0);
+
+      this.instructionsText = this.add.text(
+        w/2, h*0.26,
+        'Get ready to choose Macbeth’s thoughts.',
+        {
+          fontFamily:'Georgia',
+          fontSize: Phaser.Math.Clamp(26*this.scaleFactor,20,30)+'px',
+          color:'#d4af37',
+          align:'center'
+        }
+      ).setOrigin(0.5).setAlpha(1);
+
+      this.subInstructionsText = this.add.text(
+        w/2, h*0.31,
+        'Read the sentence. Is it a GOOD THOUGHT or a DARK THOUGHT?',
+        {
+          fontFamily:'system-ui, sans-serif',
+          fontSize: Phaser.Math.Clamp(18*this.scaleFactor,14,22)+'px',
+          color:'#ffffff',
+          align:'center',
+          wordWrap:{ width:w*0.9 }
+        }
+      ).setOrigin(0.5).setAlpha(1);
+
+      let count = 10;
+
+      const tick = () => {
+        if (count > 0) {
+          this.countdownText.setAlpha(1);
+          this.countdownText.setScale(1);
+          this.countdownText.setText(count.toString());
+
+          this.tweens.add({
+            targets:this.countdownText,
+            scale:1.25,
+            duration:260,
+            yoyo:true,
+            ease:'Quad.easeOut'
+          });
+
+          this.time.delayedCall(1000, () => {
+            count--;
+            tick();
+          });
+        } else {
+          this.countdownText.setAlpha(1);
+          this.countdownText.setScale(1);
+          this.countdownText.setText('CHOOSE!');
+
+          this.tweens.add({
+            targets:this.countdownText,
+            scale:1.35,
+            duration:350,
+            yoyo:true,
+            ease:'Quad.easeOut',
+            onComplete: () => {
+              this.tweens.add({
+                targets:this.countdownText,
+                alpha:0,
+                duration:300,
+                onComplete: () => {
+                  this.countdownText.destroy();
+                  this.startThoughtGame();
+                }
+              });
+            }
+          });
+        }
+      };
+
+      tick();
+    }
+
+    // ===== Minijuego: GOOD vs DARK THOUGHT =====
+    startThoughtGame() {
+      const w = this.scale.width;
+      const h = this.scale.height;
+
+      // barra de oscuridad
+      const barW = Math.min(w*0.6, 420*this.scaleFactor);
+      const barH = 20*this.scaleFactor;
+      const barY = h*0.38;
+
+      this.darkBarBg = this.add.rectangle(
+        w/2, barY, barW, barH, 0x111111, 0.9
+      ).setStrokeStyle(2, 0xd4af37);
+
+      this.darkBarFill = this.add.rectangle(
+        w/2 - barW/2, barY, 0, barH-4*this.scaleFactor, 0x5b1b3b, 1
+      ).setOrigin(0,0.5);
+
+      this.add.text(
+        w/2, barY - 26*this.scaleFactor,
+        'Macbeth’s dark wishes',
+        {
+          fontFamily:'Georgia',
+          fontSize:(18*this.scaleFactor)+'px',
+          color:'#d4af37'
+        }
+      ).setOrigin(0.5);
+
+      // burbuja de pensamiento (ahora SOLO texto, sin marco amarillo)
+      const fontSize = Phaser.Math.Clamp(22*this.scaleFactor,16,26);
+      const bubbleMaxWidth = w*0.7;
+
+      const bubbleContainer = this.makeThoughtBubble(
+        w/2, h*0.5,
+        '...',
+        fontSize,
+        bubbleMaxWidth
+      );
+      this.thoughtBubble = bubbleContainer.bg;  // será el propio texto
+      this.thoughtText = bubbleContainer.text;
+
+      // botones GOOD / DARK
+      const btnW = 220*this.scaleFactor;
+      const btnH = 64*this.scaleFactor;
+      const btnY = h*0.74;
+
+      this.goodBtn = this.createChoiceButton(
+        w*0.27, btnY, btnW, btnH,
+        'GOOD THOUGHT',
+        0x155d32
+      );
+
+      this.darkBtn = this.createChoiceButton(
+        w*0.73, btnY, btnW, btnH,
+        'DARK THOUGHT',
+        0x4b163f
+      );
+
+      this.goodBtn.on('pointerdown', () => this.handleChoice('GOOD'));
+      this.darkBtn.on('pointerdown', () => this.handleChoice('DARK'));
+
+      // feedback
+      this.feedbackText = this.add.text(
+        w/2, h*0.6,
+        '',
+        {
+          fontFamily:'Georgia',
+          fontSize:(22*this.scaleFactor)+'px',
+          color:'#ffffff',
+          align:'center'
+        }
+      ).setOrigin(0.5).setAlpha(0);
+
+      // pensamientos en orden
+      this.thoughts = [
+        { text:'I am happy for Malcolm.', kind:'GOOD' },
+        { text:'Malcolm is in my way.', kind:'DARK' },
+        { text:'I will serve the king with loyalty.', kind:'GOOD' },
+        { text:'Maybe I must kill the king.', kind:'DARK' },
+        { text:'I will kill the king and become king myself!!', kind:'DARK', final:true }
+      ];
+
+      this.darkness = 0;
+      this.maxDarkness = 4;
+      this.currentThoughtIndex = 0;
+
+      this.showCurrentThought();
+    }
+
+    showCurrentThought() {
+      if (!this.thoughtText) return;
+
+      const thought = this.thoughts[this.currentThoughtIndex];
+      this.thoughtText.setText(thought.text);
+
+      this.feedbackText.setAlpha(0);
+    }
+
+    handleChoice(choice) {
+      const thought = this.thoughts[this.currentThoughtIndex];
+      if (!thought) return;
+
+      const correct = (choice === thought.kind);
+
+      // desactivar momentáneamente para evitar spam
+      this.goodBtn.disableInteractive();
+      this.darkBtn.disableInteractive();
+
+      if (correct) {
+        // feedback positivo
+        this.feedbackText.setColor('#7dff7d');
+        this.feedbackText.setText('Correct!');
+        this.feedbackText.setAlpha(1);
+        this.feedbackText.scale = 0.85;
+        this.tweens.add({
+          targets:this.feedbackText,
+          scale:1,
+          duration:220,
+          ease:'Back.Out'
+        });
+
+        // si es un pensamiento oscuro, llenar más la barra
+        if (thought.kind === 'DARK') {
+          this.darkness = Math.min(this.darkness+1, this.maxDarkness);
+          this.updateDarkBar();
+        }
+
+        this.time.delayedCall(900, () => {
+          if (thought.final && correct) {
+            this.triggerFinalDarkness();
+          } else {
+            this.currentThoughtIndex++;
+            if (this.currentThoughtIndex >= this.thoughts.length) {
+              // por seguridad, si llega acá sin el flag final
+              this.finishGame();
+            } else {
+              this.showCurrentThought();
+              this.goodBtn.setInteractive({useHandCursor:true});
+              this.darkBtn.setInteractive({useHandCursor:true});
+            }
+          }
+        });
+      } else {
+        // feedback "try again" suave
+        this.feedbackText.setColor('#ffffff');
+        this.feedbackText.setText('Not exactly. Think again.');
+        this.feedbackText.setAlpha(1);
+
+        // sacudida chiquita
+        this.tweens.add({
+          targets:this.thoughtBubble,   // ahora es el texto
+          x:this.thoughtBubble.x + 6,
+          duration:60,
+          yoyo:true,
+          repeat:2,
+          ease:'Sine.easeInOut'
+        });
+
+        this.time.delayedCall(800, () => {
+          this.feedbackText.setAlpha(0);
+          this.goodBtn.setInteractive({useHandCursor:true});
+          this.darkBtn.setInteractive({useHandCursor:true});
+        });
+      }
+    }
+
+    updateDarkBar() {
+      if (!this.darkBarFill || !this.darkBarBg) return;
+      const fullWidth = this.darkBarBg.width - 4*this.scaleFactor;
+      const ratio = Phaser.Math.Clamp(this.darkness/this.maxDarkness, 0, 1);
+      const targetWidth = fullWidth * ratio;
+
+      this.tweens.add({
+        targets:this.darkBarFill,
+        width:targetWidth,
+        duration:300,
+        ease:'Quad.easeOut'
+      });
+    }
+
+    triggerFinalDarkness() {
+      const w = this.scale.width;
+      const h = this.scale.height;
+
+      // llenar la barra completa
+      this.darkness = this.maxDarkness;
+      this.updateDarkBar();
+
+      // texto grande "I WILL KILL THE KING!"
+      const big = this.add.text(
+        w/2, h*0.18,
+        'I WILL KILL THE KING!',
+        {
+          fontFamily:'Georgia',
+          fontSize: Phaser.Math.Clamp(40*this.scaleFactor,28,50)+'px',
+          color:'#ff4444',
+          align:'center'
+        }
+      ).setOrigin(0.5).setAlpha(0);
+
+      this.tweens.add({
+        targets:big,
+        alpha:1,
+        scale:1.1,
+        duration:400,
+        ease:'Back.Out'
+      });
+
+      // oscurecer un poco la pantalla
+      const darkOverlay = this.add.rectangle(
+        0,0,w,h,0x000000,0.4
+      ).setOrigin(0,0);
+      darkOverlay.alpha = 0;
+      this.tweens.add({
+        targets:darkOverlay,
+        alpha:0.4,
+        duration:500
+      });
+
+      // apagar botones
+      this.goodBtn.disableInteractive();
+      this.darkBtn.disableInteractive();
+      this.tweens.add({
+        targets:[this.goodBtn, this.darkBtn],
+        alpha:0.3,
+        duration:400
+      });
+
+      this.time.delayedCall(2000, () => {
+        this.finishGame();
+      });
+    }
+
+    finishGame() {
+      const w = this.scale.width;
+      const h = this.scale.height;
+
+      // mostrar mini resumen en inglés
+      const summary = this.add.text(
+        w/2, h*0.7,
+        "King Duncan thanks Macbeth and Banquo.\nHe names Malcolm as heir to the throne.\nMacbeth feels blocked and starts to think\nabout killing the king to become king himself.",
+        {
+          fontFamily:'Georgia',
+          fontSize: Phaser.Math.Clamp(20*this.scaleFactor,16,24)+'px',
+          color:'#ffffff',
+          align:'center',
+          wordWrap:{ width:w*0.9 },
+          lineSpacing: 14
+        }
+      ).setOrigin(0.5).setAlpha(0);
+
+      this.tweens.add({
+        targets:summary,
+        alpha:1,
+        duration:600
+      });
+
+      // habilitar NEXT en el contenedor
+      if (window.parent) {
+        window.parent.postMessage({ type:'MACBETH_ENABLE_NEXT' }, '*');
+      }
+    }
+
+    // ===== Helpers gráficos =====
+    makeBubble(text, sprite, fontSize) {
+      const padding = 14;
+      const maxWidth = 380*this.scaleFactor;
+
+      const txt = this.add.text(0,0,text,{
+        fontFamily:'system-ui, sans-serif',
+        fontSize:fontSize+'px',
+        color:'#ffffff',
+        align:'center',
+        wordWrap:{ width:maxWidth }
+      });
+
+      const w = Math.min(maxWidth, txt.width) + padding*2;
+      const h = txt.height + padding*2;
+
+      const g = this.add.graphics();
+      g.fillStyle(0x000000,0.9);
+      g.lineStyle(2,0xffffff,1);
+      g.fillRoundedRect(-w/2,-h/2,w,h,18);
+      g.strokeRoundedRect(-w/2,-h/2,w,h,18);
+      g.fillTriangle(0,h/2, -14,h/2+14, 14,h/2+14);
+
+      txt.setPosition(-txt.width/2, -txt.height/2);
+
+      let x = sprite.x;
+      let y = sprite.y - sprite.displayHeight/2 - (50*this.scaleFactor);
+
+      const cont = this.add.container(x,y,[g,txt]);
+      return cont;
+    }
+
+    // Burbuja de pensamiento SIN marco ni fondo: solo texto centrado
+    makeThoughtBubble(x,y,text,fontSize,maxWidth) {
+      const txt = this.add.text(x,y,text,{
+        fontFamily:'system-ui, sans-serif',
+        fontSize:fontSize+'px',
+        color:'#ffffff',
+        align:'center',
+        wordWrap:{ width:maxWidth }
+      }).setOrigin(0.5);
+
+      // devolvemos el mismo objeto para bg y text
+      return { bg: txt, text: txt };
+    }
+
+    createChoiceButton(x,y,w,h,label,bgColor) {
+      const rect = this.add.rectangle(0,0,w,h,bgColor,1)
+        .setStrokeStyle(2,0xd4af37,1);
+      const txt = this.add.text(0,0,label,{
+        fontFamily:'system-ui, sans-serif',
+        fontSize:(18*this.scaleFactor)+'px',
+        color:'#ffffff'
+      }).setOrigin(0.5);
+
+      const btn = this.add.container(x,y,[rect,txt]);
+      btn.setSize(w,h);
+      btn.setInteractive({ useHandCursor:true });
+
+      btn.on('pointerover', () => {
+        this.tweens.add({
+          targets:btn,
+          scale:1.04,
+          duration:120
+        });
+      });
+
+      btn.on('pointerout', () => {
+        this.tweens.add({
+          targets:btn,
+          scale:1,
+          duration:120
+        });
+      });
+
+      return btn;
+    }
+  }
+
+  // ===== Config Phaser =====
+  const config = {
+    type: Phaser.AUTO,
+    parent: 'game',
+    width: window.innerWidth,
+    height: window.innerHeight,
+    backgroundColor: '#000000',
+    pixelArt: true,
+    roundPixels: true,
+    powerPreference: 'high-performance',
+    scene: [Scene4GoodDarkThoughts]
+  };
+
+  const game = new Phaser.Game(config);
+
+  window.addEventListener('resize', () => {
+    if (game?.scale) game.scale.resize(window.innerWidth, window.innerHeight);
+  });
+</script>
+</body>
+</html>

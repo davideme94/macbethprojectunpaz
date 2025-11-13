@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Macbeth — Act I Scene I</title>
+  <style>
+    html, body { margin:0; padding:0; width:100%; height:100%; background:#000; overflow:hidden; }
+    #game { width:100%; height:100%; }
+  </style>
+</head>
+<body>
+<div id="game"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.js"></script>
+<script>
+  // ====== Permiso de música global desde index ======
+  let musicEnabled = false;
+  window.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'MACBETH_MUSIC_PREF') {
+      musicEnabled = !!event.data.enabled;
+      if (window.sceneMusic) {
+        if (musicEnabled && !window.sceneMusic.isPlaying) window.sceneMusic.play();
+        else if (!musicEnabled && window.sceneMusic.isPlaying) window.sceneMusic.stop();
+      }
+    }
+  });
+
+  class WitchesScene extends Phaser.Scene {
+    constructor() {
+      super('WitchesScene');
+
+      // Juego / UI
+      this.dragTargets = [];
+      this.targetFrames = [];     // Marcos visibles
+      this.draggables = [];
+      this.assigned = new Map();  // bubbleId -> 'w1'|'w2'|'w3'
+      this.readyBtn = null;
+      this.resultLabel = null;
+      this.countdownText = null;
+      this.readyPulsing = null;
+      this.instructions = null;
+
+      // Ajustes de drop
+      this.DROP_W = 440;  // ancho base del target (se escala)
+      this.DROP_H = 150;  // alto base del target (se escala)
+      this.SNAP_TOL = 110; // tolerancia “imán” (subido para la burbuja larga)
+      this.SHOW_TARGETS = true;
+
+      // Diálogos
+      this.dialogData = [
+        { id:'b1', text: "When shall we three meet again?\nIn thunder, lightning, or in rain?", witch:'w1' },
+        { id:'b2', text: "There to meet with Macbeth.", witch:'w2' },
+        { id:'b3', text: "Fair is foul, and foul is fair.", witch:'w3' }
+      ];
+
+      // Emisores / FX
+      this.emitters = { rain:null, fire:null, blood:null };
+      this.fogContainer = null;
+      this.autoPerfTimer = null;
+    }
+
+    preload() {
+      this.load.image('witch1', 'witch1.png');
+      this.load.image('witch2', 'witch2.png');
+      this.load.image('witch3', 'witch3.png');
+      this.load.audio('rain', 'rain.mp3');
+    }
+
+    create() {
+      const w = this.scale.width, h = this.scale.height;
+      this.scaleFactor = Phaser.Math.Clamp(Math.min(w/1600, h/900), 0.7, 1.2);
+
+      // ===== Prerender de texturas (más liviano que Graphics vivos) =====
+      this.createSimpleTextures();
+
+      // Desbloqueo audio por gesto
+      this.input.once('pointerdown', () => {
+        if (this.sound?.context?.state === 'suspended') this.sound.context.resume();
+        if (window.sceneMusic && musicEnabled && !window.sceneMusic.isPlaying) window.sceneMusic.play();
+      });
+
+      // Fondo
+      this.add.rectangle(0,0,w,h,0x02020a).setOrigin(0,0);
+
+      // Lluvia
+      const rain = this.add.particles('rainDrop');
+      this.emitters.rain = rain.createEmitter({
+        x:{min:0,max:w}, y:0, lifespan:900,
+        speedY:{min:420,max:640}, speedX:{min:-60,max:60},
+        scale:{start:1,end:0.25}, alpha:{start:0.55,end:0},
+        quantity:(w<720?2:5), blendMode:Phaser.BlendModes.ADD
+      });
+
+      // Niebla (ahora con sprites prerenderizados)
+      this.fogContainer = this.add.container(0,0);
+      const fogCount = 6; // menor que antes
+      for (let i=0;i<fogCount;i++){
+        const fog = this.add.image(0,0,'fogBlob')
+          .setAlpha(0.18)
+          .setBlendMode(Phaser.BlendModes.ADD);
+        const s = Phaser.Math.FloatBetween(0.8, 1.4);
+        fog.setScale(s * this.scaleFactor);
+        fog.x = Math.random()*w;
+        fog.y = h*0.3 + Math.random()*h*0.25;
+        this.fogContainer.add(fog);
+      }
+
+      // Fuego y sangre (bajados)
+      const fireY = h - (52*this.scaleFactor);
+      const fire = this.add.particles('fireParticle');
+      this.emitters.fire = fire.createEmitter({
+        x:{min:0,max:w}, y:fireY, lifespan:1000,
+        speedY:{min:-200,max:-140}, scale:{start:0.9*this.scaleFactor,end:0},
+        alpha:{start:1,end:0}, blendMode:Phaser.BlendModes.ADD, quantity:4
+      });
+
+      const blood = this.add.particles('bloodDrop');
+      this.emitters.blood = blood.createEmitter({
+        x:{min:0,max:w}, y:h-8, lifespan:800,
+        speedY:{min:-70,max:-30}, scale:{start:0.7,end:0},
+        alpha:{start:0.85,end:0}, quantity:1, blendMode:Phaser.BlendModes.ADD
+      });
+
+      // Relámpago
+      this.lightningFlash = this.add.rectangle(0,0,w,h,0xffffff,1).setOrigin(0,0).setAlpha(0);
+
+      // Títulos
+      const top1 = Phaser.Math.Clamp(26*this.scaleFactor,18,30);
+      const top2 = Phaser.Math.Clamp(36*this.scaleFactor,22,40);
+      this.add.text(24*this.scaleFactor, 18*this.scaleFactor,
+        'ACT I · SCENE I — "SOMEWHERE AND NOWHERE"',
+        { fontFamily:'Georgia', fontSize:top1+'px', color:'#bbbbbb' }
+      );
+      this.add.text(24*this.scaleFactor, 18*this.scaleFactor+top1+6,
+        'The Three Witches · The Storm · The Prophecy Begins',
+        { fontFamily:'Georgia', fontSize:top2+'px', color:'#d4af37' }
+      );
+
+      // Brujas
+      this.baseWitchY = h*0.58;
+      this.w2 = this.add.sprite(w/2, this.baseWitchY, 'witch2');
+      this.w1 = this.add.sprite(w/2, this.baseWitchY, 'witch1');
+      this.w3 = this.add.sprite(w/2, this.baseWitchY, 'witch3');
+      const targetHeight = Math.min(h*0.38, 360*this.scaleFactor);
+      [this.w1,this.w2,this.w3].forEach(s => {
+        const sc = targetHeight/s.height; s.setScale(sc); s.setTint(0xd0ffd0);
+      });
+      const wWidth = this.w2.displayWidth;
+      const gap = w < 1100 ? wWidth*0.85 : wWidth*1.05;
+      this.w1.x = w/2 - gap; this.w2.x = w/2; this.w3.x = w/2 + gap;
+
+      // Globos “cinemática”
+      const bubbleFont = Phaser.Math.Clamp(24*this.scaleFactor,18,30);
+      this.b1 = this.makeBubbleAboveWitch(this.dialogData[0].text, this.w1, bubbleFont);
+      this.b2 = this.makeBubbleAboveWitch(this.dialogData[1].text, this.w2, bubbleFont);
+      this.b3 = this.makeBubbleAboveWitch(this.dialogData[2].text, this.w3, bubbleFont);
+      this.b1.alpha = this.b2.alpha = this.b3.alpha = 0;
+
+      const chantSize = Phaser.Math.Clamp(26*this.scaleFactor,18,32);
+      this.chant = this.add.text(w/2, h-(70*this.scaleFactor), "", {
+        fontFamily:'Georgia', fontSize:chantSize+'px', color:'#f0f0f0', fontStyle:'italic', align:'center'
+      }).setOrigin(0.5);
+
+      this.tweens.add({ targets:this.b1, alpha:1, y:this.b1.y-6, duration:400, delay:800 });
+      this.tweens.add({ targets:this.b2, alpha:1, y:this.b2.y-6, duration:400, delay:2400 });
+      this.tweens.add({ targets:this.b3, alpha:1, y:this.b3.y-6, duration:400, delay:4000 });
+      this.time.delayedCall(5500, () => {
+        this.chant.setText('Voices echo above the storm: "Hover through the fog and filthy air."');
+      });
+
+      // Sonido
+      this.rainSound = this.sound.add('rain', { loop:true, volume:0.55 });
+      window.sceneMusic = this.rainSound;
+      if (musicEnabled) this.rainSound.play();
+
+      // Auto-Performance
+      this.startAutoPerf();
+
+      // Tras la intro: cuenta + minijuego
+      this.time.delayedCall(6200, () => {
+        this.startCountdown(() => {
+          this.tweens.add({
+            targets:[this.b1,this.b2,this.b3],
+            alpha:0, duration:400,
+            onComplete: () => {
+              [this.b1,this.b2,this.b3].forEach(c=>c.destroy());
+              this.scaleDownFXForGame();
+              this.enableDragGame();
+              this.showInstructions();
+            }
+          });
+        });
+      });
+
+      // ⬇️ Mantener: al iniciar, deshabilitar NEXT en el contenedor
+      window.parent.postMessage({ type:'MACBETH_DISABLE_NEXT' }, '*');
+
+      // Drop global con “snap”
+      this.input.on('drop', (_pointer, gameObject, dropZone) => {
+        if (!gameObject || !dropZone) return;
+        const dx = gameObject.x - dropZone.x;
+        const dy = gameObject.y - dropZone.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist <= this.SNAP_TOL * this.scaleFactor) {
+          this.tweens.add({ targets:gameObject, x:dropZone.x, y:dropZone.y-4, duration:140, ease:'Sine.easeOut' });
+          if (gameObject.name) this.assigned.set(gameObject.name, dropZone.getData('witchKey'));
+          this.updateReadyState();
+        }
+      });
+
+      // ENTER para validar
+      this.input.keyboard.on('keydown-ENTER', () => {
+        if (this.readyBtn && !this.readyBtn.disabled) this.validateAnswers();
+      });
+
+      // Limpieza al salir
+      this.events.once('shutdown', () => {
+        this.autoPerfTimer?.remove(false);
+        this.sound.stopAll();
+      });
+    }
+
+    // ====== Texturas prerenderizadas ======
+    createSimpleTextures() {
+      let g = this.add.graphics();
+      g.fillStyle(0x88aaff, 1); g.fillRect(0,0,2,16);
+      g.generateTexture('rainDrop', 2,16); g.destroy();
+
+      g = this.add.graphics();
+      g.fillStyle(0xff6600, 1); g.fillCircle(4,4,4);
+      g.generateTexture('fireParticle', 8,8); g.destroy();
+
+      g = this.add.graphics();
+      g.fillStyle(0xb30000, 1); g.fillCircle(3,3,3);
+      g.generateTexture('bloodDrop', 6,6); g.destroy();
+
+      g = this.add.graphics();
+      g.fillStyle(0xffffff, 0.10);
+      g.fillCircle(120,120,120);
+      g.generateTexture('fogBlob', 240,240); g.destroy();
+    }
+
+    // ====== Auto Performance ======
+    startAutoPerf() {
+      let frames = 0, sum = 0;
+      this.events.on('preupdate', (_t, delta) => { frames++; sum += 1000/delta; });
+      this.autoPerfTimer = this.time.addEvent({
+        delay: 2000, loop: true, callback: () => {
+          const avg = sum / frames || 60; frames = 0; sum = 0;
+          if (avg < 30) {
+            this.emitters.rain?.setQuantity(2);
+            this.emitters.fire?.setQuantity(2);
+            this.emitters.blood?.setQuantity(0);
+            this.fogContainer?.setAlpha(0.12);
+          } else if (avg < 45) {
+            this.emitters.rain?.setQuantity(3);
+            this.emitters.fire?.setQuantity(3);
+            this.emitters.blood?.setQuantity(1);
+            this.fogContainer?.setAlpha(0.16);
+          }
+        }
+      });
+    }
+
+    scaleDownFXForGame() {
+      this.fogContainer?.setVisible(false);
+      this.emitters.rain?.setQuantity(2);
+      this.emitters.fire?.setQuantity(2);
+      this.emitters.blood?.setQuantity(0);
+    }
+
+    update(time, delta) {
+      if (this.fogContainer?.visible) {
+        if (this.fogDir === undefined) this.fogDir = 1;
+        this.fogContainer.x += this.fogDir * 0.02 * (delta/16.6);
+        if (this.fogContainer.x > 80) this.fogDir = -1;
+        if (this.fogContainer.x < -80) this.fogDir = 1;
+      }
+
+      if (Math.random() < 0.0025) this.lightningFlash.alpha = 1;
+      if (this.lightningFlash.alpha > 0) {
+        this.lightningFlash.alpha -= 0.075 * (delta/16.6);
+        if (this.lightningFlash.alpha < 0) this.lightningFlash.alpha = 0;
+      }
+
+      const offset = 4*Math.sin(time*0.002);
+      this.w1.y = this.baseWitchY + offset;
+      this.w2.y = this.baseWitchY - offset;
+      this.w3.y = this.baseWitchY + offset;
+    }
+
+    // ===== Instrucciones grandes
+    showInstructions() {
+      const w = this.scale.width, h = this.scale.height;
+      const f1 = Phaser.Math.Clamp(34*this.scaleFactor,24,46);
+      const f2 = Phaser.Math.Clamp(20*this.scaleFactor,16,24);
+
+      this.instructions = this.add.container(w/2, h*0.14).setDepth(60);
+
+      const title = this.add.text(0, 0,
+        'Put the speech bubbles back over the correct witch.',
+        { fontFamily:'Georgia', fontSize:f1+'px', color:'#d4af37' }
+      ).setOrigin(0.5);
+
+      const sub = this.add.text(0, title.height*0.9 + 12,
+        'Drag and drop each line. Press READY to check.',
+        { fontFamily:'system-ui, sans-serif', fontSize:f2+'px', color:'#ffffff' }
+      ).setOrigin(0.5);
+
+      const padX = 26*this.scaleFactor, padY = 18*this.scaleFactor;
+      const wBox = Math.max(title.width, sub.width) + padX*2;
+      const hBox = title.height + sub.height + padY*2;
+
+      const bg = this.add.graphics();
+      bg.fillStyle(0x000000, 0.72);
+      bg.lineStyle(2, 0xd4af37, 0.9);
+      bg.fillRoundedRect(-wBox/2, -hBox/2, wBox, hBox, 14);
+      bg.strokeRoundedRect(-wBox/2, -hBox/2, wBox, hBox, 14);
+
+      this.instructions.add([bg, title, sub]);
+      this.instructions.alpha = 0;
+      this.tweens.add({ targets:this.instructions, alpha:1, duration:420 });
+      this.time.delayedCall(7000, () => {
+        this.tweens.add({ targets:this.instructions, alpha:0.35, duration:600 });
+      });
+    }
+
+    // ===== Countdown
+    startCountdown(onFinish) {
+      const w = this.scale.width, h = this.scale.height;
+      this.countdownText = this.add.text(w/2, h*0.12, "", {
+        fontFamily:'Georgia',
+        fontSize: Phaser.Math.Clamp(68*this.scaleFactor, 50, 92)+'px',
+        color:'#d4af37', fontStyle:'bold'
+      }).setOrigin(0.5).setDepth(65);
+
+      const seq = [5,4,3,2,1];
+      let i = 0;
+      const tick = () => {
+        if (i >= seq.length) {
+          this.tweens.add({ targets:this.countdownText, alpha:0, duration:260 });
+          if (onFinish) onFinish();
+          return;
+        }
+        this.countdownText.setAlpha(1).setText(seq[i].toString());
+        this.countdownText.setScale(0.6);
+        this.tweens.add({
+          targets:this.countdownText, scale:1, duration:300, ease:'Back.Out',
+          onComplete: () => { i++; this.time.delayedCall(420, tick); }
+        });
+      };
+      tick();
+    }
+
+    // ===== Minijuego
+    enableDragGame() {
+      const w = this.scale.width, h = this.scale.height;
+
+      // 1) Zonas de drop VISIBLES y GRANDES
+      const baseW = this.DROP_W * this.scaleFactor;
+      const baseH = this.DROP_H * this.scaleFactor;
+      const witches = [this.w1, this.w2, this.w3];
+
+      this.dragTargets = witches.map((wx, idx) => {
+        const z = this.add.zone(
+          wx.x, wx.y - wx.displayHeight/2 - (38*this.scaleFactor),
+          baseW, baseH
+        ).setRectangleDropZone(baseW, baseH);
+        z.setData('index', idx);
+        z.setData('witchKey', ['w1','w2','w3'][idx]);
+
+        if (this.SHOW_TARGETS) {
+          const frame = this.add.graphics().setDepth(58);
+          frame.lineStyle(3, 0xd4af37, 0.9);
+          frame.strokeRoundedRect(wx.x - baseW/2, z.y - baseH/2, baseW, baseH, 14);
+          const hint = this.add.text(wx.x, z.y, 'DROP HERE', {
+            fontFamily: 'system-ui, sans-serif',
+            fontSize: Phaser.Math.Clamp(16*this.scaleFactor, 12, 20)+'px',
+            color: '#d4af37'
+          }).setOrigin(0.5).setDepth(58);
+          this.targetFrames.push({frame, hint});
+        }
+        return z;
+      });
+
+      // 2) Burbujas draggables
+      const pool = Phaser.Utils.Array.Shuffle([...this.dialogData]);
+      const startY = h - (110 * this.scaleFactor);
+      const slotsX = [w*0.25, w*0.5, w*0.75];
+
+      pool.forEach((item, i) => {
+        const bubble = this.makeBubbleAt(
+          item.text,
+          Phaser.Math.Clamp(24*this.scaleFactor, 18, 28),
+          slotsX[i], startY
+        );
+        bubble.setDepth(59);
+        bubble.setName(item.id);
+        bubble.setData('solutionWitch', item.witch);
+        this.enableDrag(bubble);
+        this.draggables.push(bubble);
+      });
+
+      // 3) READY simple con líneas horizontales
+      const safeGap = 52 * this.scaleFactor;
+      const readyY  = Math.min(h * 0.78, startY - safeGap);
+      this.readyBtn = this.makePillButton(w/2, readyY, 'READY', () => this.validateAnswers());
+      this.readyBtn.setAlpha(0.45);
+      this.readyBtn.disabled = true;
+
+      // 4) Mensaje resultado enorme (centro)
+      this.resultLabel = this.add.text(w/2, h*0.50, "", {
+        fontFamily:'Georgia',
+        fontSize: Phaser.Math.Clamp(76*this.scaleFactor, 50, 110)+'px',
+        color:'#ff2b2b', fontStyle:'bold', align:'center', stroke:'#000', strokeThickness:4
+      }).setOrigin(0.5).setDepth(70).setAlpha(0);
+    }
+
+    enableDrag(container) {
+      const rectGfx = container.list[0];
+      container.setSize(rectGfx.width, rectGfx.height);
+      container.setInteractive({ useHandCursor: true });
+      this.input.setDraggable(container);
+
+      container.setData('startX', container.x);
+      container.setData('startY', container.y);
+
+      container.on('dragstart', () => {
+        container.setDepth(61);
+        this.assigned.delete(container.name);
+      });
+
+      container.on('drag', (_p, x, y) => { container.x = x; container.y = y; });
+
+      container.on('dragend', (_p, _x, _y, dropped) => {
+        if (!dropped) {
+          let snapped = false;
+          for (const z of this.dragTargets) {
+            const dx = container.x - z.x, dy = container.y - z.y;
+            if (Math.hypot(dx,dy) <= this.SNAP_TOL * this.scaleFactor) {
+              this.tweens.add({ targets:container, x:z.x, y:z.y-4, duration:140, ease:'Sine.easeOut' });
+              this.assigned.set(container.name, z.getData('witchKey'));
+              snapped = true; break;
+            }
+          }
+          if (!snapped) {
+            this.tweens.add({
+              targets: container,
+              x: container.getData('startX'),
+              y: container.getData('startY'),
+              duration: 200, ease:'Sine.easeOut'
+            });
+          }
+        }
+        this.updateReadyState();
+      });
+    }
+
+    updateReadyState() {
+      const allPlaced = this.draggables.every(d => this.assigned.has(d.name));
+      if (!this.readyBtn) return;
+      this.readyBtn.disabled = !allPlaced;
+      this.tweens.add({ targets:this.readyBtn, alpha: allPlaced ? 1 : 0.45, duration:120 });
+
+      if (allPlaced && !this.readyPulsing) {
+        this.readyPulsing = this.tweens.add({
+          targets:this.readyBtn, scale:{from:1,to:1.08},
+          duration:550, yoyo:true, repeat:-1, ease:'Sine.easeInOut'
+        });
+      } else if (!allPlaced && this.readyPulsing) {
+        this.readyPulsing.stop(); this.readyBtn.setScale(1); this.readyPulsing = null;
+      }
+    }
+
+    validateAnswers() {
+      if (!this.readyBtn || this.readyBtn.disabled) return;
+
+      let allCorrect = true;
+      this.draggables.forEach(d => {
+        const should = d.getData('solutionWitch');
+        const got = this.assigned.get(d.name);
+        const gfx = d.list[0];
+        if (should === got) this.flashStroke(gfx, 0x19ff6a);
+        else { allCorrect = false; this.flashStroke(gfx, 0xff3b3b); this.shake(d); }
+      });
+
+      if (allCorrect) {
+        const msg = Math.random() < 0.5 ? 'WELL DONE!!' : 'EXCELLENT!!';
+        this.showResult(msg, true);
+      } else {
+        this.showResult('TRY AGAIN', false);
+        this.resetAllBubbles();
+      }
+    }
+
+    resetAllBubbles() {
+      this.assigned.clear();
+      if (this.readyBtn) {
+        this.readyBtn.disabled = true;
+        this.readyBtn.setAlpha(0.45);
+        if (this.readyPulsing) { this.readyPulsing.stop(); this.readyPulsing = null; this.readyBtn.setScale(1); }
+      }
+      const baseDelay = 160;
+      this.draggables.forEach((d,i) => {
+        this.tweens.add({
+          targets:d, x:d.getData('startX'), y:d.getData('startY'),
+          duration:200, delay: baseDelay + i*40, ease:'Sine.easeOut'
+        });
+      });
+    }
+
+    flashStroke(graphic, color) {
+      graphic.lineStyle(3, color, 1); graphic.strokePath();
+      this.time.delayedCall(240, () => { graphic.lineStyle(2, 0xffffff, 1); graphic.strokePath(); });
+    }
+
+    shake(obj) {
+      this.tweens.add({ targets:obj, x:obj.x+8, duration:60, yoyo:true, repeat:2, ease:'Sine.easeInOut' });
+    }
+
+    showResult(text, success) {
+      if (this.readyPulsing) { this.readyPulsing.stop(); this.readyPulsing = null; }
+      if (this.readyBtn) this.readyBtn.setScale(1);
+
+      if (success) {
+        this.targetFrames.forEach(t => { t.frame.destroy(); t.hint.destroy(); });
+        this.targetFrames = [];
+
+        this.input.enabled = false;
+        this.resultLabel.setText(text).setColor('#ff2b2b').setAlpha(0).setScale(0.85);
+
+        const splat = this.add.graphics().setDepth(69);
+        splat.fillStyle(0x8a0000,0.85);
+        for (let i=0;i<18;i++){
+          const r=Phaser.Math.Between(6,14)*this.scaleFactor, a=Math.random()*Math.PI*2;
+          const x=this.resultLabel.x + Math.cos(a)*Phaser.Math.Between(10,90)*this.scaleFactor;
+          const y=this.resultLabel.y + Math.sin(a)*Phaser.Math.Between(8,60)*this.scaleFactor;
+          splat.fillCircle(x,y,r);
+        }
+        this.tweens.add({ targets:this.resultLabel, alpha:1, duration:120 });
+        this.tweens.add({ targets:this.resultLabel, scale:{from:0.85,to:1.0}, duration:380, ease:'Back.Out' });
+
+        // ✅ Habilitamos NEXT inmediatamente y arrancamos el conteo al instante del EXCELLENT
+        window.parent.postMessage({ type:'MACBETH_ENABLE_NEXT' }, '*');
+        this.startNextSceneCountdown();
+
+        // Solo esperamos para limpiar el splat visual
+        this.time.delayedCall(1600, () => {
+          splat.destroy();
+        });
+      } else {
+        this.resultLabel.setText(text).setColor('#f0f0f0').setAlpha(1).setScale(1);
+        this.tweens.add({ targets:this.resultLabel, alpha:0, duration:900, delay:500 });
+      }
+    }
+
+    // ===== Conteo antes de cambiar de página =====
+    startNextSceneCountdown() {
+      const w = this.scale.width;
+      const h = this.scale.height;
+
+      const fontSize = Phaser.Math.Clamp(28 * this.scaleFactor, 20, 34);
+      const countdownText = this.add.text(
+        w / 2,
+        h * 0.82,
+        "",
+        {
+          fontFamily: 'system-ui, sans-serif',
+          fontSize: fontSize + 'px',
+          color: '#ffffff',
+          align: 'center'
+        }
+      ).setOrigin(0.5).setDepth(80);
+
+      let counter = 3;
+      countdownText.setText(`The page will change in ${counter}...`);
+
+      this.time.addEvent({
+        delay: 1000,
+        repeat: 2, // 3 → 2 → 1
+        callback: () => {
+          counter--;
+          if (counter > 0) {
+            countdownText.setText(`The page will change in ${counter}...`);
+          } else {
+            countdownText.setText(`Changing page...`);
+            this.time.delayedCall(700, () => {
+              window.parent.postMessage({ type:'MACBETH_REQUEST_NEXT' }, '*');
+            });
+          }
+        }
+      });
+    }
+
+    // ===== Burbujas / Botón =====
+    makeBubbleAboveWitch(text, witch, fontSize) {
+      const padding=16, maxWidth=440*this.scaleFactor;
+      const txt = this.add.text(0,0,text,{
+        fontFamily:'system-ui, sans-serif', fontSize:fontSize+'px', color:'#ffffff',
+        align:'center', wordWrap:{ width:maxWidth }
+      });
+      const w = Math.min(maxWidth, txt.width) + padding*2;
+      const h = txt.height + padding*2;
+
+      const g = this.add.graphics();
+      g.fillStyle(0x000000,0.95); g.lineStyle(2,0xffffff,1);
+      g.fillRoundedRect(-w/2,-h/2,w,h,18); g.strokeRoundedRect(-w/2,-h/2,w,h,18);
+      g.fillTriangle(0,h/2,-14,h/2+14,14,h/2+14);
+      txt.setPosition(-txt.width/2, -txt.height/2);
+
+      const x=witch.x, y=witch.y - witch.displayHeight/2 - (40*this.scaleFactor);
+      const cont = this.add.container(x,y,[g,txt]); g.width=w; g.height=h;
+      return cont;
+    }
+
+    makeBubbleAt(text, fontSize, x, y) {
+      const padding=16, maxWidth=440*this.scaleFactor;
+      const txt = this.add.text(0,0,text,{
+        fontFamily:'system-ui, sans-serif', fontSize:fontSize+'px', color:'#ffffff',
+        align:'center', wordWrap:{ width:maxWidth }
+      });
+      const w = Math.min(maxWidth, txt.width) + padding*2;
+      const h = txt.height + padding*2;
+
+      const g = this.add.graphics();
+      g.fillStyle(0x000000,0.95); g.lineStyle(2,0xffffff,1);
+      g.fillRoundedRect(-w/2,-h/2,w,h,18); g.strokeRoundedRect(-w/2,-h/2,w,h,18);
+      g.fillTriangle(0,h/2,-14,h/2+14,14,h/2+14);
+      txt.setPosition(-txt.width/2, -txt.height/2);
+
+      const cont = this.add.container(x,y,[g,txt]); g.width=w; g.height=h;
+      return cont;
+    }
+
+    // READY simple: texto + líneas horizontales
+    makePillButton(x, y, label, onClick) {
+      const lineLen = 120 * this.scaleFactor;
+      const gap = 18 * this.scaleFactor;
+
+      const txt = this.add.text(0,0,label,{
+        fontFamily:'system-ui, sans-serif',
+        fontSize: Phaser.Math.Clamp(28*this.scaleFactor, 22, 36)+'px',
+        color:'#d4af37',
+        fontStyle:'bold',
+        stroke:'#000',
+        strokeThickness:3
+      }).setOrigin(0.5);
+
+      const g = this.add.graphics();
+
+      // línea izquierda
+      g.lineStyle(2, 0xd4af37, 0.9);
+      g.beginPath();
+      g.moveTo(-lineLen/2 - gap, 0);
+      g.lineTo(-txt.width/2 - gap, 0);
+      g.strokePath();
+
+      // línea derecha
+      g.beginPath();
+      g.moveTo(txt.width/2 + gap, 0);
+      g.lineTo(lineLen/2 + gap, 0);
+      g.strokePath();
+
+      const w = lineLen + txt.width + gap*2;
+      const h = txt.height * 1.6;
+
+      const c = this.add.container(x,y,[g,txt]).setSize(w,h).setDepth(65);
+      c.setInteractive({ useHandCursor:true });
+      c.on('pointerover', ()=>c.setScale(1.05));
+      c.on('pointerout', ()=>c.setScale(1.00));
+      c.on('pointerdown', ()=>{ if(!c.disabled && onClick) onClick(); });
+      return c;
+    }
+  }
+
+  // ===== Config Phaser con tweaks de performance =====
+  const config = {
+    type: Phaser.AUTO,
+    parent: 'game',
+    width: window.innerWidth,
+    height: window.innerHeight,
+    backgroundColor: '#000000',
+    pixelArt: true,
+    roundPixels: true,
+    powerPreference: 'high-performance',
+    fps: { target: 50, min: 30, deltaHistory: 10, smoothStep: true, forceSetTimeOut: true },
+    scene: [WitchesScene]
+  };
+
+  const game = new Phaser.Game(config);
+  window.addEventListener('resize', () => {
+    if (game?.scale) game.scale.resize(window.innerWidth, window.innerHeight);
+  });
+</script>
+</body>
+</html>

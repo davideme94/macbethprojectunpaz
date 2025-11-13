@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Macbeth — Act I Scene III</title>
+  <style>
+    html, body { margin:0; padding:0; width:100%; height:100%; background:#000; overflow:hidden; }
+    #game { width:100%; height:100%; }
+  </style>
+</head>
+<body>
+<div id="game"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.js"></script>
+<script>
+  // ====== Permiso de música global desde index ======
+  let musicEnabled = false;
+  window.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'MACBETH_MUSIC_PREF') {
+      musicEnabled = !!event.data.enabled;
+      if (window.sceneMusic) {
+        if (musicEnabled && !window.sceneMusic.isPlaying) window.sceneMusic.play();
+        else if (!musicEnabled && window.sceneMusic.isPlaying) window.sceneMusic.stop();
+      }
+    }
+  });
+
+  class Scene3WitchesMemory extends Phaser.Scene {
+    constructor() {
+      super('Scene3WitchesMemory');
+
+      // Juego memoria
+      this.orbs = [];
+      this.sequence = [];
+      this.playerIndex = 0;
+      this.round = 0;
+      this.roundLengths = [3,4,5];
+      this.isPlayerTurn = false;
+
+      this.infoText = null;
+      this.roundText = null;
+
+      this.macbeth = null;
+      this.banquo = null;
+      this.witches = [];
+
+      this.prophecyStep = 0;
+      this.prophecyLines = [];
+
+      this.bgMusic = null;
+      this.fog = null;
+
+      this.countdownText = null;
+      this.praiseText = null;
+    }
+
+    preload() {
+      this.load.image('witch1', 'witch1.png');
+      this.load.image('witch2', 'witch2.png');
+      this.load.image('witch3', 'witch3.png');
+      this.load.image('macbeth', 'macbeth.png');
+      this.load.image('banquo', 'banquo.png');
+      this.load.image('captain', 'captain.png'); // opcional
+
+      this.load.audio('scene3_ambience', 'rain.mp3');
+    }
+
+    create() {
+      console.log('Scene3WitchesMemory — create() called');
+
+      const w = this.scale.width, h = this.scale.height;
+      this.scaleFactor = Phaser.Math.Clamp(Math.min(w/1600, h/900), 0.7, 1.2);
+
+      // Fondo
+      const grad = this.add.graphics();
+      grad.fillGradientStyle(0x050509,0x050509,0x1b1510,0x1b1510,1);
+      grad.fillRect(0,0,w,h);
+
+      const horizon = h * 0.6;
+      this.add.rectangle(0, horizon, w, h-horizon, 0x050503).setOrigin(0,0);
+
+      this.createFog();
+
+      // Audio
+      this.bgMusic = this.sound.add('scene3_ambience', { loop:true, volume:0.5 });
+      window.sceneMusic = this.bgMusic;
+      this.input.once('pointerdown', () => {
+        if (this.sound?.context?.state === 'suspended') this.sound.context.resume();
+        if (musicEnabled && !this.bgMusic.isPlaying) this.bgMusic.play();
+      });
+
+      // Título arriba
+      const top1 = Phaser.Math.Clamp(26*this.scaleFactor,18,30);
+      this.add.text(24*this.scaleFactor, 18*this.scaleFactor,
+        'ACT I · SCENE III — "THE MEMORY GAME"',
+        { fontFamily:'Georgia', fontSize:top1+'px', color:'#d4af37' }
+      );
+
+      // Macbeth & Banquo
+      const baseY = horizon - 40*this.scaleFactor;
+      this.macbeth = this.add.sprite(-200, baseY, 'macbeth');
+      this.banquo = this.add.sprite(-380, baseY, 'banquo');
+
+      const targetHeight = Math.min(h*0.32, 320*this.scaleFactor);
+      [this.macbeth, this.banquo].forEach(s => {
+        const sc = targetHeight / s.height;
+        s.setScale(sc).setTint(0xf3e7c0);
+      });
+
+      this.tweens.add({ targets:this.macbeth, x:w*0.30, duration:1400, delay:200, ease:'Sine.Out' });
+      this.tweens.add({ targets:this.banquo, x:w*0.15, duration:1400, delay:300, ease:'Sine.Out' });
+
+      // Etiquetas de nombres para Macbeth y Banquo
+      const nameStyle = {
+        fontFamily:'Georgia',
+        fontSize: Phaser.Math.Clamp(18*this.scaleFactor, 12, 20)+'px',
+        color:'#ffffff'
+      };
+      const labelOffset = targetHeight/2 + 28*this.scaleFactor;
+
+      this.add.text(w*0.30, baseY + labelOffset, 'Macbeth', nameStyle).setOrigin(0.5,0);
+      this.add.text(w*0.15, baseY + labelOffset, 'Banquo', nameStyle).setOrigin(0.5,0);
+
+      // Brujas
+      const wy = baseY;
+      const wGap = 120*this.scaleFactor;
+      const wCenter = w*0.72;
+
+      const w2 = this.add.sprite(wCenter, wy, 'witch2').setAlpha(0);
+      const w1 = this.add.sprite(wCenter - wGap, wy+10*this.scaleFactor, 'witch1').setAlpha(0);
+      const w3 = this.add.sprite(wCenter + wGap, wy+10*this.scaleFactor, 'witch3').setAlpha(0);
+      this.witches = [w1,w2,w3];
+
+      [w1,w2,w3].forEach(s => {
+        const sc = targetHeight / s.height;
+        s.setScale(sc).setTint(0xd0ffd0);
+      });
+
+      this.tweens.add({ targets:w2, alpha:1, duration:700, delay:1200 });
+      this.tweens.add({ targets:[w1,w3], alpha:1, duration:700, delay:1450 });
+
+      // Etiqueta de nombre para las brujas
+      this.add.text(wCenter, wy + labelOffset, 'The Witches', nameStyle).setOrigin(0.5,0);
+
+      // Intro simple
+      const intro = this.add.text(w/2, h*0.12,
+        'Macbeth and Banquo meet three witches on the way home.\n' +
+        '"Play our memory game," they say. "If you win, we tell your future."',
+        {
+          fontFamily:'Georgia',
+          fontSize: Phaser.Math.Clamp(20*this.scaleFactor, 16, 24)+'px',
+          color:'#ffffff',
+          align:'center',
+          wordWrap:{ width:w*0.9 }
+        }
+      ).setOrigin(0.5).setAlpha(1);
+
+      // Textos UI
+      this.roundText = this.add.text(w/2, h*0.24, "", {
+        fontFamily:'Georgia',
+        fontSize: Phaser.Math.Clamp(26*this.scaleFactor, 20, 30)+'px',
+        color:'#d4af37',
+        align:'center'
+      }).setOrigin(0.5).setAlpha(0);
+
+      this.infoText = this.add.text(w/2, h*0.29, "", {
+        fontFamily:'system-ui, sans-serif',
+        fontSize: Phaser.Math.Clamp(18*this.scaleFactor, 14, 22)+'px',
+        color:'#ffffff',
+        align:'center',
+        wordWrap:{ width:w*0.8 }
+      }).setOrigin(0.5).setAlpha(0);
+
+      this.countdownText = this.add.text(w/2, h*0.45, "", {
+        fontFamily:'Georgia',
+        fontSize: Phaser.Math.Clamp(80*this.scaleFactor, 48, 110)+'px',
+        color:'#ff5555',
+        align:'center'
+      }).setOrigin(0.5).setAlpha(0);
+
+      this.praiseText = this.add.text(w/2, h*0.48, "", {
+        fontFamily:'Georgia',
+        fontSize: Phaser.Math.Clamp(70*this.scaleFactor, 44, 96)+'px',
+        color:'#7dff7d',
+        align:'center'
+      }).setOrigin(0.5).setAlpha(0);
+
+      this.createOrbs();
+
+      this.time.delayedCall(3500, () => {
+        this.roundText.setAlpha(1);
+        this.infoText.setAlpha(1);
+        this.startCountdown();
+      });
+
+      window.parent.postMessage({ type:'MACBETH_DISABLE_NEXT' }, '*');
+
+      this.events.once('shutdown', () => {
+        this.sound.stopAll();
+      });
+    }
+
+    // ===== Cuenta regresiva =====
+    startCountdown() {
+      let count = 10;
+
+      this.roundText.setText('Get ready to play');
+      this.infoText.setText('Watch the colors. Then copy the pattern.');
+
+      const tick = () => {
+        if (count > 0) {
+          this.countdownText.setAlpha(1);
+          this.countdownText.setScale(1);
+          this.countdownText.setText(count.toString());
+
+          this.tweens.add({
+            targets: this.countdownText,
+            scale: 1.25,
+            duration: 250,
+            yoyo: true,
+            ease: 'Quad.easeOut'
+          });
+
+          this.time.delayedCall(1000, () => {
+            count--;
+            tick();
+          });
+
+        } else {
+          this.countdownText.setAlpha(1);
+          this.countdownText.setScale(1);
+          this.countdownText.setText('MEMORY!');
+
+          this.tweens.add({
+            targets: this.countdownText,
+            scale: 1.35,
+            duration: 350,
+            yoyo: true,
+            ease: 'Quad.easeOut',
+            onComplete: () => {
+              this.tweens.add({
+                targets: this.countdownText,
+                alpha: 0,
+                duration: 300,
+                onComplete: () => {
+                  this.startGame();
+                }
+              });
+            }
+          });
+        }
+      };
+
+      tick();
+    }
+
+    createFog() {
+      const w = this.scale.width, h = this.scale.height;
+      this.fog = this.add.container(0,0);
+
+      const g = this.add.graphics();
+      g.fillStyle(0xffffff, 0.12);
+      g.fillCircle(160,160,160);
+      g.generateTexture('fog3',320,320);
+      g.destroy();
+
+      for (let i=0; i<4; i++){
+        const img = this.add.image(
+          Math.random()*w,
+          h*0.45 + Math.random()*h*0.25,
+          'fog3'
+        ).setAlpha(0.18).setBlendMode(Phaser.BlendModes.ADD);
+        img.setScale(Phaser.Math.FloatBetween(0.8,1.4));
+        this.fog.add(img);
+      }
+    }
+
+    update(time, delta) {
+      if (this.fog) {
+        if (this.fogDir === undefined) this.fogDir = 1;
+        this.fog.x += this.fogDir * 0.03 * (delta/16.6);
+        if (this.fog.x > 50) this.fogDir = -1;
+        if (this.fog.x < -50) this.fogDir = 1;
+      }
+    }
+
+    // ===== Memory Game =====
+    createOrbs() {
+      const w = this.scale.width, h = this.scale.height;
+      const y = h*0.72;
+
+      // separación mayor para orbes más grandes
+      const positions = [
+        w*0.50 - 170*this.scaleFactor,
+        w*0.50,
+        w*0.50 + 170*this.scaleFactor
+      ];
+
+      const colors = [0xff4b4b, 0x4bff9a, 0x4bc2ff];
+
+      // textura base MÁS GRANDE (120x120)
+      let g = this.add.graphics();
+      g.fillStyle(0xffffff,1);
+      g.fillCircle(60,60,54);
+      g.generateTexture('orbBase',120,120);
+      g.destroy();
+
+      positions.forEach((px,idx)=>{
+        const orb = this.add.image(px,y,'orbBase');
+        orb.setTint(colors[idx]);
+        orb.setScale(this.scaleFactor * 1.5);
+        orb.setAlpha(0.9);
+        orb.setData('index', idx);
+        orb.setInteractive({ useHandCursor:true });
+        orb.on('pointerdown', () => this.onOrbClick(idx));
+        this.orbs.push(orb);
+      });
+    }
+
+    startGame() {
+      this.round = 0;
+      this.startRound();
+    }
+
+    startRound() {
+      const w = this.scale.width;
+      this.isPlayerTurn = false;
+      this.playerIndex = 0;
+      this.sequence = [];
+
+      const len = this.roundLengths[this.round];
+      for (let i=0; i<len; i++){
+        this.sequence.push(Phaser.Math.Between(0, this.orbs.length-1));
+      }
+
+      this.roundText.setText(`Round ${this.round+1} — Watch the pattern`);
+      this.infoText.setText(
+        'Watch the lights carefully.\n' +
+        'Then click the same lights in the same order.'
+      );
+
+      this.roundText.setX(w/2);
+      this.showSequence(0);
+    }
+
+    showSequence(step) {
+      if (step >= this.sequence.length) {
+        this.time.delayedCall(500, () => {
+          this.roundText.setText(`Round ${this.round+1} — Your turn`);
+          this.infoText.setText('Now it is your turn. Click the lights in the same order.');
+          this.isPlayerTurn = true;
+        });
+        return;
+      }
+
+      const idx = this.sequence[step];
+      const orb = this.orbs[idx];
+
+      this.tweens.add({
+        targets: orb,
+        alpha: 1,
+        scale: orb.scale * 1.2,
+        duration: 250,
+        yoyo: true,
+        ease: 'Sine.easeInOut',
+        onComplete: () => {
+          this.time.delayedCall(200, () => this.showSequence(step+1));
+        }
+      });
+    }
+
+    onOrbClick(idx) {
+      if (!this.isPlayerTurn) return;
+
+      const orb = this.orbs[idx];
+      this.tweens.add({
+        targets: orb,
+        scale: orb.scale * 1.1,
+        duration: 100,
+        yoyo: true
+      });
+
+      const correctIndex = this.sequence[this.playerIndex];
+      if (idx === correctIndex) {
+        this.playerIndex++;
+        if (this.playerIndex >= this.sequence.length) {
+          this.isPlayerTurn = false;
+          this.onRoundSuccess();
+        }
+      } else {
+        this.isPlayerTurn = false;
+        this.onRoundFail();
+      }
+    }
+
+    onRoundSuccess() {
+      const witchMessages = [
+        'First Witch: "Great job, brave soldier!"',
+        'Second Witch: "You follow the colors very well."',
+        'Third Witch: "Perfect memory! Let us continue."'
+      ];
+      this.infoText.setText(witchMessages[this.round] || 'The witches smile at you.');
+
+      const praises = ['GREAT JOB!', 'WELL DONE!', 'VERY GOOD!'];
+      const choice = Phaser.Utils.Array.GetRandom(praises);
+
+      this.praiseText.setText(choice);
+      this.praiseText.setAlpha(1);
+      this.praiseText.setScale(0.9);
+
+      this.tweens.add({
+        targets: this.praiseText,
+        scale: 1.15,
+        duration: 260,
+        yoyo: true,
+        ease: 'Quad.easeOut'
+      });
+
+      this.tweens.add({
+        targets:this.orbs,
+        alpha:{from:1,to:0.4},
+        duration:200,
+        yoyo:true,
+        repeat:1
+      });
+
+      this.time.delayedCall(900, () => {
+        this.roundText.setText(`Next round is coming...`);
+      });
+
+      this.time.delayedCall(1800, () => {
+        this.praiseText.setAlpha(0);
+        this.round++;
+        if (this.round >= this.roundLengths.length) {
+          this.startProphecy();
+        } else {
+          this.startRound();
+        }
+      });
+    }
+
+    onRoundFail() {
+      this.infoText.setText(
+        'The pattern is wrong.\n' +
+        'Oops! Try again and watch more carefully.'
+      );
+      this.roundText.setText(`Round ${this.round+1} — Watch again`);
+
+      this.tweens.add({
+        targets: this.orbs,
+        x: '+=8',
+        duration: 60,
+        yoyo: true,
+        repeat: 3,
+        ease: 'Sine.easeInOut'
+      });
+
+      this.time.delayedCall(1500, () => {
+        this.playerIndex = 0;
+        this.startRound();
+      });
+    }
+
+    // ===== Profecía =====
+    startProphecy() {
+      this.isPlayerTurn = false;
+      this.orbs.forEach(o => o.disableInteractive());
+      this.roundText.setText("The magic is complete.");
+      this.infoText.setText(
+        'The witches are happy.\n' +
+        '"Now we will tell your future," they say.'
+      );
+
+      this.tweens.add({
+        targets:this.orbs,
+        alpha:0,
+        duration:800,
+        delay:300
+      });
+
+      this.tweens.add({ targets:this.macbeth, x:this.macbeth.x+10, duration:200, yoyo:true, repeat:2 });
+      this.tweens.add({ targets:this.banquo,  x:this.banquo.x-10, duration:200, yoyo:true, repeat:2 });
+
+      this.prophecyStep = 0;
+      this.prophecyLines = [];
+
+      // Un poco más de tiempo antes de empezar las líneas
+      this.time.delayedCall(2200, () => this.advanceProphecy());
+    }
+
+    advanceProphecy() {
+      const lines = [
+        '"Macbeth! You are Thane of Glamis.',
+        'Macbeth! You will be Thane of Cawdor.',
+        'Macbeth! One day you will be king.',
+        'Banquo: smaller than Macbeth, but greater in heart.',
+        'Not as happy as Macbeth, but happier in the end.',
+        'You will not be king, Banquo, but your children will be.',
+        'So all hail, Macbeth and Banquo!"'
+      ];
+
+      const w = this.scale.width;
+      const h = this.scale.height;
+
+      if (this.prophecyStep >= lines.length) {
+        // Más tiempo con todas las líneas en pantalla
+        this.time.delayedCall(4000, () => {
+          this.endWithMessenger();
+        });
+        return;
+      }
+
+      const text = lines[this.prophecyStep];
+
+      const baseY = h * 0.38;
+      const lineGap = 30 * this.scaleFactor;
+      const y = baseY + this.prophecyStep * lineGap;
+
+      const lineText = this.add.text(w/2, y, text, {
+        fontFamily:'Georgia',
+        fontSize: Phaser.Math.Clamp(20*this.scaleFactor,16,24)+'px',
+        color:'#ffffff',
+        align:'center',
+        wordWrap:{ width:w*0.85 }
+      }).setOrigin(0.5).setAlpha(0);
+
+      this.prophecyLines.push(lineText);
+      this.prophecyStep++;
+
+      this.tweens.add({
+        targets: lineText,
+        alpha: 1,
+        duration: 350,
+        ease: 'Quad.easeOut'
+      });
+
+      // Más tiempo para leer cada línea antes de la siguiente
+      this.time.delayedCall(3200, () => this.advanceProphecy());
+    }
+
+    endWithMessenger() {
+      const w = this.scale.width, h = this.scale.height;
+
+      this.tweens.add({
+        targets:this.witches,
+        alpha:0,
+        duration:700
+      });
+
+      let captain = null;
+      if (this.textures.exists('captain')) {
+        const captainY = this.macbeth.y;
+        captain = this.add.sprite(w+200, captainY, 'captain').setTint(0xf5f5f5);
+        const sc = this.macbeth.displayHeight / captain.height;
+        captain.setScale(sc);
+
+        this.tweens.add({
+          targets: captain,
+          x: w*0.90,
+          duration: 1000,
+          delay: 400
+        });
+      }
+
+      const msg = this.add.text(w*0.65, h*0.18,
+        'Messenger: "Macbeth, the king is very happy with you.\n' +
+        'He gives you a new title today:\n' +
+        'Thane of Cawdor.\n' +
+        'Congratulations, brave Macbeth!"',
+        {
+          fontFamily:'Georgia',
+          fontSize: Phaser.Math.Clamp(18*this.scaleFactor,14,22)+'px',
+          color:'#ffffff',
+          wordWrap:{ width:w*0.6 }
+        }
+      ).setAlpha(0);
+
+      this.tweens.add({ targets:msg, alpha:1, duration:600, delay:600 });
+
+      // Más tiempo para leer el mensaje antes de habilitar NEXT
+      this.time.delayedCall(5000, () => {
+        window.parent.postMessage({ type:'MACBETH_ENABLE_NEXT' }, '*');
+      });
+    }
+  }
+
+  // ===== Config Phaser =====
+  const config = {
+    type: Phaser.AUTO,
+    parent: 'game',
+    width: window.innerWidth,
+    height: window.innerHeight,
+    backgroundColor: '#000000',
+    pixelArt: true,
+    roundPixels: true,
+    powerPreference: 'high-performance',
+    scene: [Scene3WitchesMemory]
+  };
+
+  const game = new Phaser.Game(config);
+  window.addEventListener('resize', () => {
+    if (game?.scale) game.scale.resize(window.innerWidth, window.innerHeight);
+  });
+</script>
+</body>
+</html>

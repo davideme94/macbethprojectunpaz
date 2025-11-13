@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Macbeth — Act I Scene II</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+    }
+    #game {
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+<body>
+<div id="game"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.js"></script>
+<script>
+  class BattleReportScene extends Phaser.Scene {
+    constructor() {
+      super('BattleReportScene');
+
+      // ---- Minijuego: ordenar eventos de la batalla ----
+      this.eventsData = [
+        { id: 'e1', text: 'Macdonwald rebels against King Duncan.', order: 1 },
+        { id: 'e2', text: 'Macbeth kills the traitor Macdonwald.', order: 2 },
+        { id: 'e3', text: "Norway attacks but Macbeth's side wins.", order: 3 },
+        { id: 'e4', text: 'Duncan gives Macbeth the title "Thane of Cawdor".', order: 4 }
+      ];
+      this.dragTargets = [];
+      this.draggables = [];
+      this.assigned = new Map(); // id -> slotOrder
+      this.readyBtn = null;
+      this.resultText = null;
+    }
+
+    preload() {
+      this.load.image('duncan', 'duncan.png');
+      this.load.image('captain', 'captain.png');
+
+      // lluvia
+      let g = this.add.graphics();
+      g.fillStyle(0x88aaff, 1);
+      g.fillRect(0, 0, 2, 16);
+      g.generateTexture('rainDrop', 2, 16);
+      g.destroy();
+
+      // fogata (partículas fuego)
+      g = this.add.graphics();
+      g.fillStyle(0xffb347, 1);
+      g.fillCircle(4, 4, 4);
+      g.generateTexture('fireParticle', 8, 8);
+      g.destroy();
+
+      // humo
+      g = this.add.graphics();
+      g.fillStyle(0xcccccc, 0.9);
+      g.fillCircle(12, 12, 12);
+      g.generateTexture('smokePuff', 24, 24);
+      g.destroy();
+
+      // tienda de campaña simple
+      g = this.add.graphics();
+      g.fillStyle(0x111111, 1);
+      g.fillTriangle(0, 40, 40, 0, 80, 40);
+      g.fillStyle(0x0b0b0b, 1);
+      g.fillRect(8, 40, 64, 26);
+      g.lineStyle(2, 0xffffff, 0.2);
+      g.strokeTriangle(0, 40, 40, 0, 80, 40);
+      g.generateTexture('tent', 80, 66);
+      g.destroy();
+
+      // estandarte
+      g = this.add.graphics();
+      g.fillStyle(0x222222, 1);
+      g.fillRect(0, 0, 4, 60);
+      g.fillStyle(0x7a1515, 1);
+      g.fillRect(4, 8, 26, 18);
+      g.fillTriangle(4, 26, 30, 26, 18, 38);
+      g.generateTexture('banner', 34, 60);
+      g.destroy();
+
+      // silueta soldados
+      g = this.add.graphics();
+      g.fillStyle(0x050507, 1);
+      g.fillCircle(8, 6, 6);
+      g.fillRect(4, 12, 8, 14);
+      g.fillRect(2, 26, 4, 10);
+      g.fillRect(10, 26, 4, 10);
+      g.generateTexture('soldier', 16, 40);
+      g.destroy();
+    }
+
+    create() {
+      const w = this.scale.width;
+      const h = this.scale.height;
+      this.scaleFactor = Phaser.Math.Clamp(Math.min(w / 1600, h / 900), 0.7, 1.2);
+
+      // fondo: cielo oscuro + "horizonte" más claro
+      let bg = this.add.graphics();
+      bg.fillStyle(0x020208, 1);
+      bg.fillRect(0, 0, w, h);
+      bg.fillStyle(0x05050a, 1);
+      bg.fillRect(0, 0, w, h * 0.45);
+      bg.fillStyle(0x030307, 1);
+      bg.fillRect(0, h * 0.45, w, h * 0.2);
+
+      // niebla fina en horizonte
+      const fogLine = this.add.graphics();
+      fogLine.fillStyle(0xffffff, 0.03);
+      fogLine.fillRect(0, h * 0.45 - 18, w, 40);
+      fogLine.setBlendMode(Phaser.BlendModes.ADD);
+
+      // lluvia suave
+      const rain = this.add.particles('rainDrop');
+      rain.createEmitter({
+        x: { min: 0, max: w },
+        y: 0,
+        lifespan: 1000,
+        speedY: { min: 250, max: 380 },
+        speedX: { min: -40, max: 40 },
+        scale: { start: 0.8, end: 0.2 },
+        alpha: { start: 0.35, end: 0 },
+        quantity: 4,
+        blendMode: Phaser.BlendModes.ADD
+      });
+
+      // CAMPAMENTO AL FONDO
+      const camp = this.add.container(0, 0);
+
+      const groundY = h * 0.7;
+      this.groundY = groundY; // para el minijuego
+
+      // suelo
+      let ground = this.add.graphics();
+      ground.fillStyle(0x050506, 1);
+      ground.fillRect(0, groundY, w, h - groundY + 10);
+      ground.generateTexture('groundTex', w, h - groundY + 10);
+      ground.destroy();
+      const groundImg = this.add.image(0, groundY, 'groundTex').setOrigin(0, 0);
+      camp.add(groundImg);
+
+      // árboles detrás (siluetas)
+      for (let i = 0; i < 10; i++) {
+        const tx = i * (w / 10) + Phaser.Math.Between(-30, 30);
+        const ty = h * 0.45 + Phaser.Math.Between(-10, 10);
+        const tree = this.add.graphics();
+        tree.fillStyle(0x070708, 1);
+        const height = Phaser.Math.Between(80, 160) * this.scaleFactor;
+        const width = height * 0.35;
+        tree.fillTriangle(tx, ty, tx + width / 2, ty - height, tx + width, ty);
+        tree.setAlpha(0.22 + Math.random() * 0.1);
+        camp.add(tree);
+      }
+
+      // tiendas
+      const tentScale = 0.9 * this.scaleFactor;
+      const tentsX = [w * 0.18, w * 0.36, w * 0.54, w * 0.82];
+      tentsX.forEach((tx, i) => {
+        const t = this.add.image(tx, groundY - 28 * this.scaleFactor, 'tent')
+          .setOrigin(0.5, 1)
+          .setScale(tentScale)
+          .setAlpha(0.35 + 0.1 * (i % 2));
+        camp.add(t);
+      });
+
+      // soldados
+      for (let i = 0; i < 8; i++) {
+        const sx = 40 + i * (w / 9);
+        const sy = groundY - 4;
+        const s = this.add.image(sx, sy, 'soldier')
+          .setOrigin(0.5, 1)
+          .setScale(0.6 * this.scaleFactor)
+          .setAlpha(0.18);
+        camp.add(s);
+      }
+
+      // estandarte
+      const banner = this.add.image(w * 0.76, groundY - 10, 'banner')
+        .setOrigin(0.5, 1)
+        .setScale(0.9 * this.scaleFactor)
+        .setAlpha(0.85);
+      camp.add(banner);
+
+      // títulos
+      const t1 = Phaser.Math.Clamp(26 * this.scaleFactor, 18, 30);
+      const t2 = Phaser.Math.Clamp(34 * this.scaleFactor, 22, 38);
+
+      this.add.text(24 * this.scaleFactor, 18 * this.scaleFactor,
+        'ACT I · SCENE II — "A camp near Forres"',
+        { fontFamily: 'Georgia', fontSize: t1 + 'px', color: '#bbbbbb' }
+      );
+      this.add.text(
+        24 * this.scaleFactor,
+        18 * this.scaleFactor + t1 + 6,
+        'The King Rewards Macbeth · The Traitor Exposed',
+        { fontFamily: 'Georgia', fontSize: t2 + 'px', color: '#d4af37' }
+      );
+
+      // PERSONAJES
+      const captainTargetX = w * 0.25;
+
+      // capitán entra desde la izquierda
+      this.captain = this.add.sprite(-200, groundY, 'captain');
+
+      // Duncan quieto en su lugar
+      this.duncan = this.add.sprite(w * 0.72, groundY - 10 * this.scaleFactor, 'duncan');
+
+      const targetH = Math.min(h * 0.35, 320 * this.scaleFactor);
+      [this.captain, this.duncan].forEach(s => {
+        const sc = targetH / s.height;
+        s.setScale(sc);
+      });
+
+      this.captainBaseY = this.captain.y;
+      this.duncanBaseScale = this.duncan.scale;
+
+      // NOMBRES BAJO LOS PERSONAJES
+      const nameStyle = {
+        fontFamily: 'Georgia',
+        fontSize: (16 * this.scaleFactor) + 'px',
+        color: '#d4af37'
+      };
+
+      this.captainName = this.add.text(
+        captainTargetX,
+        groundY + (targetH / 2) + 10 * this.scaleFactor,
+        'Captain',
+        nameStyle
+      ).setOrigin(0.5, 0).setAlpha(0);
+
+      this.duncanName = this.add.text(
+        this.duncan.x,
+        this.duncan.y + (targetH / 2) + 10 * this.scaleFactor,
+        'King Duncan',
+        nameStyle
+      ).setOrigin(0.5, 0).setAlpha(0);
+
+      // FOGATA CENTRAL
+      const fireX = w * 0.48;
+      const fireY = groundY - 4 * this.scaleFactor;
+
+      const fireBase = this.add.graphics();
+      fireBase.fillStyle(0x151515, 1);
+      fireBase.fillEllipse(fireX, fireY + 6 * this.scaleFactor, 40 * this.scaleFactor, 10 * this.scaleFactor);
+      fireBase.fillStyle(0x552211, 1);
+      fireBase.fillRect(fireX - 8 * this.scaleFactor, fireY, 16 * this.scaleFactor, 8 * this.scaleFactor);
+
+      const fire = this.add.particles('fireParticle');
+      fire.createEmitter({
+        x: fireX,
+        y: fireY,
+        lifespan: 650,
+        speedY: { min: -120, max: -220 },
+        scale: { start: 1.2 * this.scaleFactor, end: 0 },
+        alpha: { start: 1, end: 0 },
+        gravityY: 0,
+        quantity: 4,
+        blendMode: Phaser.BlendModes.ADD
+      });
+
+      const smoke = this.add.particles('smokePuff');
+      smoke.createEmitter({
+        x: fireX,
+        y: fireY - 10 * this.scaleFactor,
+        lifespan: 1400,
+        speedY: { min: -30, max: -60 },
+        scale: { start: 0.3 * this.scaleFactor, end: 0.8 * this.scaleFactor },
+        alpha: { start: 0.18, end: 0 },
+        quantity: 1,
+        blendMode: Phaser.BlendModes.NORMAL
+      });
+
+      this.fireLight = this.add.circle(
+        fireX,
+        fireY - 10 * this.scaleFactor,
+        120 * this.scaleFactor,
+        0xffd27f,
+        0.18
+      );
+      this.fireLight.setBlendMode(Phaser.BlendModes.ADD);
+
+      // NARRADOR (texto final)
+      const narrSize = Phaser.Math.Clamp(24 * this.scaleFactor, 18, 30);
+      this.narr = this.add.text(w / 2, h - 80 * this.scaleFactor, "", {
+        fontFamily: 'Georgia',
+        fontSize: narrSize + 'px',
+        color: '#f0f0f0',
+        fontStyle: 'italic',
+        align: 'center'
+      }).setOrigin(0.5);
+
+      // ===== SECUENCIA ANIMADA =====
+
+      // 1) Capitán entra
+      this.tweens.add({
+        targets: this.captain,
+        x: captainTargetX,
+        duration: 900,
+        ease: 'Sine.easeOut',
+        onComplete: () => {
+          // aparece su nombre
+          this.captainName.setAlpha(1);
+          // 2) bubble del capitán
+          const font = Phaser.Math.Clamp(24 * this.scaleFactor, 18, 28);
+
+          this.bCap = this.makeBubble(
+            "My lord, Macbeth has crushed the rebels.\nHe slew the traitor Macdonwald\nand broke the Norwegian attack.",
+            this.captain,
+            font
+          );
+          this.bCap.alpha = 0;
+          this.tweens.add({
+            targets: this.bCap,
+            alpha: 1,
+            y: this.bCap.y - 6,
+            duration: 500,
+            delay: 150
+          });
+
+          // 3) bubble noticia Thane of Cawdor
+          this.time.delayedCall(2100, () => {
+            this.bNews = this.makeBubble(
+              "Macdonwald, the Thane of Cawdor,\nis a traitor.",
+              null,
+              font,
+              w * 0.48,
+              groundY - targetH * 0.95
+            );
+            this.bNews.alpha = 0;
+            this.tweens.add({
+              targets: this.bNews,
+              alpha: 1,
+              y: this.bNews.y - 6,
+              duration: 500
+            });
+          });
+
+          // 4) bubble de Duncan
+          this.time.delayedCall(3900, () => {
+            this.bDun = this.makeBubble(
+              "No more that Thane of Cawdor\nshall deceive our trust.\nPut him to death,\nand with his former title greet Macbeth.",
+              this.duncan,
+              font
+            );
+            this.bDun.alpha = 0;
+            this.tweens.add({
+              targets: this.bDun,
+              alpha: 1,
+              y: this.bDun.y - 6,
+              duration: 500
+            });
+          });
+
+          // mostrar nombre de Duncan un poquito después
+          this.tweens.add({
+            targets: this.duncanName,
+            alpha: 1,
+            duration: 400,
+            delay: 600
+          });
+
+          // 5) narrador final
+          this.time.delayedCall(6400, () => {
+            this.narr.setText("Macbeth is named Thane of Cawdor —\nthe witches' prophecy begins to come true.");
+
+            // un poco después, arrancamos el minijuego (con conteo)
+            this.time.delayedCall(2000, () => {
+              this.startMiniGame();
+            });
+          });
+        }
+      });
+    }
+
+    update(time, delta) {
+      // leve parpadeo de luz de la fogata
+      if (this.fireLight) {
+        const pulse = 0.16 + 0.04 * Math.sin(time * 0.005);
+        this.fireLight.setAlpha(pulse);
+      }
+
+      // Duncan con "respiración" sutil
+      if (this.duncan) {
+        const s = this.duncanBaseScale + Math.sin(time * 0.003) * 0.01;
+        this.duncan.setScale(s);
+      }
+    }
+
+    // ========= MINIJUEGO: CONTEO + UI =========
+    startMiniGame() {
+      const w = this.scale.width;
+      const h = this.scale.height;
+
+      const fontSize = Phaser.Math.Clamp(72 * this.scaleFactor, 46, 90);
+      const countText = this.add.text(w / 2, h * 0.5, "", {
+        fontFamily: 'Georgia',
+        fontSize: fontSize + 'px',
+        color: '#d4af37',
+        fontStyle: 'bold'
+      }).setOrigin(0.5).setDepth(100);
+
+      const seq = [3, 2, 1];
+      let i = 0;
+      const tick = () => {
+        if (i >= seq.length) {
+          this.tweens.add({
+            targets: countText,
+            alpha: 0,
+            duration: 250,
+            onComplete: () => {
+              countText.destroy();
+              this.buildMiniGameUI();
+            }
+          });
+          return;
+        }
+        countText.setAlpha(1).setText(seq[i].toString());
+        countText.setScale(0.4);
+        this.tweens.add({
+          targets: countText,
+          scale: 1,
+          duration: 260,
+          ease: 'Back.Out',
+          onComplete: () => {
+            i++;
+            this.time.delayedCall(420, tick);
+          }
+        });
+      };
+      tick();
+    }
+
+    // ========= MINIJUEGO: ORDENAR EVENTOS (UI) =========
+    buildMiniGameUI() {
+      const w = this.scale.width;
+      const h = this.scale.height;
+
+      const titleSize = Phaser.Math.Clamp(26 * this.scaleFactor, 18, 30);
+      this.add.text(w / 2, h * 0.12,
+        'Put the battle events in the correct order (1–4).',
+        {
+          fontFamily: 'Georgia',
+          fontSize: titleSize + 'px',
+          color: '#d4af37'
+        }
+      ).setOrigin(0.5);
+
+      const subSize = Phaser.Math.Clamp(18 * this.scaleFactor, 14, 22);
+      this.add.text(w / 2, h * 0.16,
+        'Drag each card into a numbered slot, then press CHECK.',
+        {
+          fontFamily: 'system-ui, sans-serif',
+          fontSize: subSize + 'px',
+          color: '#ffffff'
+        }
+      ).setOrigin(0.5);
+
+      const slotW = 260 * this.scaleFactor;
+      const slotH = 70 * this.scaleFactor;
+      const baseY = h * 0.26;
+
+      const slotsX = [w * 0.18, w * 0.38, w * 0.58, w * 0.78];
+
+      // slots numerados 1–4
+      this.dragTargets = [];
+      for (let i = 0; i < 4; i++) {
+        const x = slotsX[i];
+
+        const zone = this.add.zone(x, baseY, slotW, slotH)
+          .setRectangleDropZone(slotW, slotH);
+        zone.setData('order', i + 1);
+        this.dragTargets.push(zone);
+
+        const frame = this.add.graphics();
+        frame.lineStyle(2, 0xd4af37, 0.9);
+        frame.strokeRoundedRect(
+          x - slotW / 2,
+          baseY - slotH / 2,
+          slotW,
+          slotH,
+          10
+        );
+
+        this.add.text(
+          x,
+          baseY - slotH / 2 - 16 * this.scaleFactor,
+          String(i + 1),
+          {
+            fontFamily: 'Georgia',
+            fontSize: (18 * this.scaleFactor) + 'px',
+            color: '#d4af37'
+          }
+        ).setOrigin(0.5);
+      }
+
+      // cartas draggables (eventos)
+      const bottomY = this.groundY - 40 * this.scaleFactor;
+      const shuffled = Phaser.Utils.Array.Shuffle([...this.eventsData]);
+
+      this.draggables = [];
+      this.assigned.clear();
+
+      shuffled.forEach((ev, i) => {
+        const card = this.makeEventCard(ev.text, slotsX[i], bottomY);
+        card.setData('id', ev.id);
+        card.setData('order', ev.order);
+        this.enableEventDrag(card);
+        this.draggables.push(card);
+      });
+
+      // botón CHECK simple
+      const btnWidth = 140 * this.scaleFactor;
+      const btnHeight = 40 * this.scaleFactor;
+      const btnY = baseY + slotH / 2 + 40 * this.scaleFactor;
+
+      const btnBg = this.add.rectangle(0, 0, btnWidth, btnHeight, 0x111111, 1)
+        .setStrokeStyle(2, 0xd4af37, 1);
+      const btnText = this.add.text(0, 0, 'CHECK', {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: (20 * this.scaleFactor) + 'px',
+        color: '#d4af37'
+      }).setOrigin(0.5);
+
+      const btn = this.add.container(w / 2, btnY, [btnBg, btnText])
+        .setSize(btnWidth, btnHeight);
+      btn.setInteractive({ useHandCursor: true });
+      btn.on('pointerdown', () => {
+        if (!btn.disabled) this.validateEvents();
+      });
+      btn.disabled = true;
+      btn.alpha = 0.4;
+      this.readyBtn = btn;
+
+      // mensaje de resultado (reutilizable)
+      this.resultText = this.add.text(
+        w / 2,
+        btnY + 50 * this.scaleFactor,
+        '',
+        {
+          fontFamily: 'Georgia',
+          fontSize: (22 * this.scaleFactor) + 'px',
+          color: '#ffffff'
+        }
+      ).setOrigin(0.5).setAlpha(0);
+
+      // manejador global de drop
+      this.input.on('drop', (pointer, gameObject, dropZone) => {
+        if (!gameObject || !dropZone) return;
+        const id = gameObject.getData('id');
+        if (!id) return;
+
+        // Snap al centro del slot
+        this.tweens.add({
+          targets: gameObject,
+          x: dropZone.x,
+          y: dropZone.y,
+          duration: 120,
+          ease: 'Sine.easeOut'
+        });
+
+        this.assigned.set(id, dropZone.getData('order'));
+        this.updateReadyState();
+      });
+    }
+
+    enableEventDrag(card) {
+      card.setInteractive({ useHandCursor: true });
+      this.input.setDraggable(card);
+
+      card.setData('startX', card.x);
+      card.setData('startY', card.y);
+
+      card.on('dragstart', () => {
+        const id = card.getData('id');
+        if (id) this.assigned.delete(id);
+        card.setDepth(10);
+      });
+
+      card.on('drag', (pointer, x, y) => {
+        card.x = x;
+        card.y = y;
+      });
+
+      card.on('dragend', (pointer, x, y, dropped) => {
+        if (!dropped) {
+          this.tweens.add({
+            targets: card,
+            x: card.getData('startX'),
+            y: card.getData('startY'),
+            duration: 150,
+            ease: 'Sine.easeOut'
+          });
+        }
+        this.updateReadyState();
+      });
+    }
+
+    updateReadyState() {
+      if (!this.readyBtn) return;
+      const allPlaced = this.draggables.every(c => {
+        const id = c.getData('id');
+        return this.assigned.has(id);
+      });
+
+      this.readyBtn.disabled = !allPlaced;
+      this.tweens.add({
+        targets: this.readyBtn,
+        alpha: allPlaced ? 1 : 0.4,
+        duration: 120
+      });
+    }
+
+    validateEvents() {
+      if (!this.readyBtn || this.readyBtn.disabled) return;
+
+      let allCorrect = true;
+
+      this.draggables.forEach(card => {
+        const id = card.getData('id');
+        const should = card.getData('order');
+        const got = this.assigned.get(id);
+        if (should !== got) {
+          allCorrect = false;
+          this.shake(card);
+        }
+      });
+
+      if (allCorrect) {
+        this.showMiniResult(true);
+      } else {
+        this.showMiniResult(false);
+        this.resetEvents();
+      }
+    }
+
+    resetEvents() {
+      this.assigned.clear();
+      if (this.readyBtn) {
+        this.readyBtn.disabled = true;
+        this.readyBtn.alpha = 0.4;
+      }
+      this.draggables.forEach(card => {
+        this.tweens.add({
+          targets: card,
+          x: card.getData('startX'),
+          y: card.getData('startY'),
+          duration: 200,
+          ease: 'Sine.easeOut'
+        });
+      });
+    }
+
+    showMiniResult(success) {
+      const w = this.scale.width;
+      if (!this.resultText) return;
+
+      this.resultText.setAlpha(1);
+      this.resultText.setColor(success ? '#d4af37' : '#ffffff');
+      this.resultText.setText(success ? 'Excellent! The battle is in the right order.' : 'Try again.');
+
+      if (success) {
+        // bloqueamos el botón y el drag
+        if (this.readyBtn) this.readyBtn.disabled = true;
+        this.input.enabled = false;
+
+        // habilitar avance en el contenedor (si lo usás)
+        if (window.parent) {
+          window.parent.postMessage({ type: 'MACBETH_ENABLE_NEXT' }, '*');
+          window.parent.postMessage({ type: 'MACBETH_REQUEST_NEXT' }, '*');
+        }
+      } else {
+        this.tweens.add({
+          targets: this.resultText,
+          alpha: 0,
+          duration: 800,
+          delay: 700
+        });
+      }
+    }
+
+    shake(card) {
+      this.tweens.add({
+        targets: card,
+        x: card.x + 6,
+        duration: 60,
+        yoyo: true,
+        repeat: 2,
+        ease: 'Sine.easeInOut'
+      });
+    }
+
+    // ========= Burbujas de diálogo de la cinemática =========
+    makeBubble(text, sprite, fontSize, forcedX, forcedY) {
+      const padding = 14;
+      const maxWidth = 380 * this.scaleFactor;
+
+      const txt = this.add.text(0, 0, text, {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: fontSize + 'px',
+        color: '#ffffff',
+        align: 'center',
+        wordWrap: { width: maxWidth }
+      });
+
+      const w = Math.min(maxWidth, txt.width) + padding * 2;
+      const h = txt.height + padding * 2;
+
+      const g = this.add.graphics();
+      g.fillStyle(0x000000, 0.95);
+      g.lineStyle(2, 0xffffff, 1);
+      g.fillRoundedRect(-w/2, -h/2, w, h, 18);
+      g.strokeRoundedRect(-w/2, -h/2, w, h, 18);
+      g.fillTriangle(0, h/2, -14, h/2 + 14, 14, h/2 + 14);
+
+      txt.setPosition(-txt.width / 2, -txt.height / 2);
+
+      let x, y;
+      if (sprite) {
+        x = sprite.x;
+        y = sprite.y - sprite.displayHeight / 2 - (40 * this.scaleFactor);
+      } else {
+        x = forcedX;
+        y = forcedY;
+      }
+
+      return this.add.container(x, y, [g, txt]);
+    }
+
+    // ========= Carta simple para el minijuego =========
+    makeEventCard(text, x, y) {
+      const padding = 10;
+      const maxWidth = 280 * this.scaleFactor;
+
+      const txt = this.add.text(0, 0, text, {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: (16 * this.scaleFactor) + 'px',
+        color: '#ffffff',
+        align: 'center',
+        wordWrap: { width: maxWidth }
+      });
+
+      const w = Math.min(maxWidth, txt.width) + padding * 2;
+      const h = txt.height + padding * 2;
+
+      const g = this.add.graphics();
+      g.fillStyle(0x000000, 0.9);
+      g.lineStyle(1, 0xd4af37, 1);
+      g.fillRoundedRect(-w/2, -h/2, w, h, 10);
+      g.strokeRoundedRect(-w/2, -h/2, w, h, 10);
+
+      txt.setPosition(-txt.width / 2, -txt.height / 2);
+
+      const cont = this.add.container(x, y, [g, txt]);
+      cont.setSize(w, h);
+      return cont;
+    }
+  }
+
+  const config = {
+    type: Phaser.AUTO,
+    parent: 'game',
+    width: window.innerWidth,
+    height: window.innerHeight,
+    backgroundColor: '#000000',
+    scene: [BattleReportScene]
+  };
+
+  const game = new Phaser.Game(config);
+
+  window.addEventListener('resize', () => {
+    if (game && game.scale) game.scale.resize(window.innerWidth, window.innerHeight);
+  });
+</script>
+</body>
+</html>
